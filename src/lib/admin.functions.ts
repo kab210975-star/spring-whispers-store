@@ -63,9 +63,9 @@ export const updateOrder = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
-    if (data.status) patch["status"] = data.status;
-    if (data.admin_note !== undefined) patch["admin_note"] = data.admin_note || null;
+    const patch: { status?: "new" | "in_progress" | "delivered" | "cancelled"; admin_note?: string | null } = {};
+    if (data.status) patch.status = data.status;
+    if (data.admin_note !== undefined) patch.admin_note = data.admin_note || null;
 
     const { error } = await context.supabase.from("orders").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);

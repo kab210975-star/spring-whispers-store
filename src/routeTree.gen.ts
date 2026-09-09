@@ -10,12 +10,54 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as DeliveryRouteImport } from './routes/delivery'
+import { Route as OfferRouteImport } from './routes/offer'
+import { Route as OrderAcceptedRouteImport } from './routes/order-accepted'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as CatalogIndexRouteImport } from './routes/catalog.index'
 import { Route as CatalogSlugRouteImport } from './routes/catalog.$slug'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryRoute = DeliveryRouteImport.update({
+  id: '/delivery',
+  path: '/delivery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfferRoute = OfferRouteImport.update({
+  id: '/offer',
+  path: '/offer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrderAcceptedRoute = OrderAcceptedRouteImport.update({
+  id: '/order-accepted',
+  path: '/order-accepted',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CatalogIndexRoute = CatalogIndexRouteImport.update({
@@ -28,33 +70,99 @@ const CatalogSlugRoute = CatalogSlugRouteImport.update({
   path: '/catalog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/cart': typeof CartRoute
+  '/delivery': typeof DeliveryRoute
+  '/offer': typeof OfferRoute
+  '/order-accepted': typeof OrderAcceptedRoute
+  '/privacy': typeof PrivacyRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/cart': typeof CartRoute
+  '/delivery': typeof DeliveryRoute
+  '/offer': typeof OfferRoute
+  '/order-accepted': typeof OrderAcceptedRoute
+  '/privacy': typeof PrivacyRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog': typeof CatalogIndexRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/cart': typeof CartRoute
+  '/delivery': typeof DeliveryRoute
+  '/offer': typeof OfferRoute
+  '/order-accepted': typeof OrderAcceptedRoute
+  '/privacy': typeof PrivacyRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/catalog/$slug' | '/catalog/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/cart'
+    | '/delivery'
+    | '/offer'
+    | '/order-accepted'
+    | '/privacy'
+    | '/catalog/$slug'
+    | '/catalog/'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/catalog/$slug' | '/catalog'
-  id: '__root__' | '/' | '/catalog/$slug' | '/catalog/'
+  to:
+    | '/'
+    | '/auth'
+    | '/cart'
+    | '/delivery'
+    | '/offer'
+    | '/order-accepted'
+    | '/privacy'
+    | '/catalog/$slug'
+    | '/catalog'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/cart'
+    | '/delivery'
+    | '/offer'
+    | '/order-accepted'
+    | '/privacy'
+    | '/catalog/$slug'
+    | '/catalog/'
+    | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  CartRoute: typeof CartRoute
+  DeliveryRoute: typeof DeliveryRoute
+  OfferRoute: typeof OfferRoute
+  OrderAcceptedRoute: typeof OrderAcceptedRoute
+  PrivacyRoute: typeof PrivacyRoute
   CatalogSlugRoute: typeof CatalogSlugRoute
   CatalogIndexRoute: typeof CatalogIndexRoute
 }
@@ -66,6 +174,55 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery': {
+      id: '/delivery'
+      path: '/delivery'
+      fullPath: '/delivery'
+      preLoaderRoute: typeof DeliveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offer': {
+      id: '/offer'
+      path: '/offer'
+      fullPath: '/offer'
+      preLoaderRoute: typeof OfferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/order-accepted': {
+      id: '/order-accepted'
+      path: '/order-accepted'
+      fullPath: '/order-accepted'
+      preLoaderRoute: typeof OrderAcceptedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/catalog/': {
@@ -82,11 +239,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  CartRoute: CartRoute,
+  DeliveryRoute: DeliveryRoute,
+  OfferRoute: OfferRoute,
+  OrderAcceptedRoute: OrderAcceptedRoute,
+  PrivacyRoute: PrivacyRoute,
   CatalogSlugRoute: CatalogSlugRoute,
   CatalogIndexRoute: CatalogIndexRoute,
 }

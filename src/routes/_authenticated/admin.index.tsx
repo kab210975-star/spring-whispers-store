@@ -51,7 +51,7 @@ function AdminOrdersPage() {
 
   if (access.isLoading) {
     return (
-      <AdminShell role={access.data?.role}>
+      <AdminShell>
         <p className="text-muted-foreground">Загружаем…</p>
       </AdminShell>
     );

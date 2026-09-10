@@ -5,7 +5,13 @@ import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { site } from "@/lib/site";
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export function AdminShell({
+  children,
+  role,
+}: {
+  children: ReactNode;
+  role?: "admin" | "staff" | null;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -15,6 +21,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
+
+  const isAdmin = role === "admin";
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,13 +48,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
             >
               Товары
             </Link>
-            <Link
-              to="/admin/staff"
-              activeProps={{ className: "text-primary" }}
-              className="text-muted-foreground hover:text-primary"
-            >
-              Сотрудники
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin/staff"
+                activeProps={{ className: "text-primary" }}
+                className="text-muted-foreground hover:text-primary"
+              >
+                Сотрудники
+              </Link>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-4 text-sm">
             <Link to="/" className="text-muted-foreground hover:text-primary">

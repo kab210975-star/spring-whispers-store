@@ -19,18 +19,25 @@ export const Route = createFileRoute("/_authenticated/admin/staff")({
   component: AdminStaffPage,
 });
 
+type StaffRole = "admin" | "staff" | null;
+
 type StaffRow = {
   id: string;
   email: string | null;
   full_name: string | null;
   created_at: string;
-  isAdmin: boolean;
+  role: StaffRole;
+};
+
+const roleLabels: Record<"admin" | "staff", string> = {
+  admin: "администратор",
+  staff: "сотрудник",
 };
 
 function AdminStaffPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchStaff = useServerFn(listStaff);
-  const changeRole = useServerFn(setAdminRole);
+  const changeRole = useServerFn(setStaffRole);
   const remove = useServerFn(deleteStaffAccount);
   const queryClient = useQueryClient();
 
@@ -43,13 +50,14 @@ function AdminStaffPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (input: { user_id: string; admin: boolean }) => changeRole({ data: input }),
+    mutationFn: (input: { user_id: string; role: StaffRole }) => changeRole({ data: input }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
       toast.success("Права обновлены");
     },
     onError: (error: Error) => toast.error("Не удалось изменить права", { description: error.message }),
   });
+
 
   const deleteMutation = useMutation({
     mutationFn: (input: { user_id: string }) => remove({ data: input }),

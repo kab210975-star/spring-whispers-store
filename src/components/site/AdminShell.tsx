@@ -10,7 +10,7 @@ export function AdminShell({
   role,
 }: {
   children: ReactNode;
-  role?: "admin" | "staff" | null;
+  role?: "admin" | "staff" | null | undefined;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();

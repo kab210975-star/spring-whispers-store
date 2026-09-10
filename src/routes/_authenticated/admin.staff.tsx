@@ -104,7 +104,8 @@ function AdminStaffPage() {
                 <th className="px-5 py-4">Сотрудник</th>
                 <th className="px-5 py-4">Почта</th>
                 <th className="px-5 py-4">Добавлен</th>
-                <th className="px-5 py-4">Доступ</th>
+                <th className="px-5 py-4">Роль</th>
+                <th className="px-5 py-4">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -116,19 +117,58 @@ function AdminStaffPage() {
                     {new Date(person.created_at).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={mutation.isPending}
-                        onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
-                        className={`h-9 rounded-full px-4 text-xs ${
-                          person.isAdmin
-                            ? "bg-primary text-primary-foreground"
+                    <span
+                      className={`inline-flex h-8 items-center rounded-full px-4 text-xs ${
+                        person.role === "admin"
+                          ? "bg-primary text-primary-foreground"
+                          : person.role === "staff"
+                            ? "border border-primary/40 text-primary"
                             : "border border-border text-muted-foreground"
-                        }`}
-                      >
-                        {person.isAdmin ? "администратор" : "нет доступа"}
-                      </button>
+                      }`}
+                    >
+                      {person.role ? roleLabels[person.role] : "нет доступа"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {person.role === null && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => mutation.mutate({ user_id: person.id, role: "staff" })}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Дать доступ сотрудника
+                        </button>
+                      )}
+                      {person.role === "staff" && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Сделать ${person.email ?? "сотрудника"} администратором?`)) {
+                              mutation.mutate({ user_id: person.id, role: "admin" });
+                            }
+                          }}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Сделать администратором
+                        </button>
+                      )}
+                      {person.role === "admin" && person.id !== access.data?.profile?.id && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Снять права администратора у ${person.email ?? "сотрудника"}?`)) {
+                              mutation.mutate({ user_id: person.id, role: "staff" });
+                            }
+                          }}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Снять права администратора
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={deleteMutation.isPending || person.id === access.data?.profile?.id}
@@ -146,6 +186,7 @@ function AdminStaffPage() {
                   </td>
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>

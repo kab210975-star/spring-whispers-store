@@ -140,6 +140,12 @@ export const deleteProduct = createServerFn({ method: "POST" })
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+
     const { data: profiles, error } = await context.supabase
       .from("profiles")
       .select("id, email, full_name, created_at")
@@ -158,6 +164,12 @@ export const setAdminRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(input))
   .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+
     if (data.admin) {
       const { error } = await context.supabase
         .from("user_roles")

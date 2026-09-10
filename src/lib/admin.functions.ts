@@ -122,13 +122,10 @@ export const saveProduct = createServerFn({ method: "POST" })
       return { id };
     }
 
-    const { data: created, error } = await context.supabase
-      .from("products")
-      .insert(payload)
-      .select("id")
-      .single();
+    const newId = crypto.randomUUID();
+    const { error } = await context.supabase.from("products").insert({ id: newId, ...payload });
     if (error) throw new Error(error.message);
-    return { id: created.id as string };
+    return { id: newId };
   });
 
 export const deleteProduct = createServerFn({ method: "POST" })

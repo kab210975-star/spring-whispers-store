@@ -81,10 +81,11 @@ function AdminProductsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const canManage = access.data?.role === "admin" || access.data?.role === "staff";
   const products = useQuery({
     queryKey: ["admin", "products"],
     queryFn: () => fetchProducts(),
-    enabled: access.data?.isAdmin === true,
+    enabled: canManage,
   });
 
   function refresh() {

@@ -69,11 +69,11 @@ function AdminStaffPage() {
   const list = (staff.data ?? []) as StaffRow[];
 
   return (
-    <AdminShell>
+    <AdminShell role={access.data?.role ?? null}>
       <h1 className="font-display text-3xl">Сотрудники</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Сотрудник появляется в списке после первого входа. Полный доступ к заявкам и товарам есть только
-        у администраторов.
+        Сотрудник появляется в списке после первого входа. Управление правами и удаление заявок доступны
+        только администраторам.
       </p>
 
       {staff.isLoading ? (

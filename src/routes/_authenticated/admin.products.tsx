@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
 import { deleteProduct, getMyAccess, listAllProducts, saveProduct } from "@/lib/admin.functions";
 import { formatPrice, kindLabels } from "@/lib/site";
+import { slugify } from "@/lib/slug";
 import type { Product, ProductKind } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/admin/products")({

@@ -198,38 +198,50 @@ export const listStaff = createServerFn({ method: "GET" })
 
     const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
 
-    return (profiles ?? []).map((profile) => ({
-      ...profile,
-      isAdmin: (roles ?? []).some((r) => r.user_id === profile.id && r.role === "admin"),
-    }));
+    return (profiles ?? []).map((profile) => {
+      const own = (roles ?? []).filter((r) => r.user_id === profile.id);
+      const role = own.some((r) => r.role === "admin")
+        ? ("admin" as const)
+        : own.some((r) => r.role === "staff")
+          ? ("staff" as const)
+          : null;
+      return { ...profile, role, isAdmin: role === "admin" };
+    });
   });
 
-export const setAdminRole = createServerFn({ method: "POST" })
+/** Устанавливает роль: администратор, сотрудник или без доступа. */
+export const setStaffRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({ user_id: z.string().uuid(), role: z.enum(["admin", "staff"]).nullable() })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: isAdmin } = await context.supabase.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
     if (!isAdmin) throw new Error("Нет доступа");
+    if (data.user_id === context.userId && data.role !== "admin") {
+      throw new Error("Нельзя снять права администратора с себя");
+    }
 
-    if (data.admin) {
+    const { error: clearError } = await context.supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id);
+    if (clearError) throw new Error(clearError.message);
+
+    if (data.role) {
       const { error } = await context.supabase
         .from("user_roles")
-        .upsert({ user_id: data.user_id, role: "admin" }, { onConflict: "user_id,role" });
-      if (error) throw new Error(error.message);
-    } else {
-      if (data.user_id === context.userId) throw new Error("Нельзя снять права с себя");
-      const { error } = await context.supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", data.user_id)
-        .eq("role", "admin");
+        .insert({ user_id: data.user_id, role: data.role });
       if (error) throw new Error(error.message);
     }
     return { ok: true };
   });
+
 
 export const deleteStaffAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

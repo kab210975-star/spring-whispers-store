@@ -28,11 +28,13 @@ function AdminOrdersPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchOrders = useServerFn(listOrders);
   const saveOrder = useServerFn(updateOrder);
+  const removeOrder = useServerFn(deleteOrder);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
   const canManage = access.data?.role === "admin" || access.data?.role === "staff";
+  const isAdmin = access.data?.role === "admin";
   const orders = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => fetchOrders(),
@@ -47,6 +49,15 @@ function AdminOrdersPage() {
       toast.success("Заявка обновлена");
     },
     onError: () => toast.error("Не удалось сохранить"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => removeOrder({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      toast.success("Заявка удалена");
+    },
+    onError: () => toast.error("Не удалось удалить заявку"),
   });
 
   if (access.isLoading) {

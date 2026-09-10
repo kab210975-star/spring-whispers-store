@@ -81,10 +81,11 @@ function AdminProductsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const canManage = access.data?.role === "admin" || access.data?.role === "staff";
   const products = useQuery({
     queryKey: ["admin", "products"],
     queryFn: () => fetchProducts(),
-    enabled: access.data?.isAdmin === true,
+    enabled: canManage,
   });
 
   function refresh() {
@@ -119,9 +120,9 @@ function AdminProductsPage() {
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!canManage) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role ?? null}>
         <NoAccess />
       </AdminShell>
     );
@@ -130,7 +131,7 @@ function AdminProductsPage() {
   const list = (products.data ?? []) as Product[];
 
   return (
-    <AdminShell>
+    <AdminShell role={access.data?.role ?? null}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl">Товары</h1>

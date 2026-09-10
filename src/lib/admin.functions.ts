@@ -20,17 +20,14 @@ export const registerStaff = createServerFn({ method: "POST" })
 export const getMyAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    const { data: profile } = await context.supabase
-      .from("profiles")
-      .select("id, email, full_name")
-      .eq("id", context.userId)
-      .maybeSingle();
+    const [{ data: isAdmin }, { data: isStaff }, { data: profile }] = await Promise.all([
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "staff" }),
+      context.supabase.from("profiles").select("id, email, full_name").eq("id", context.userId).maybeSingle(),
+    ]);
 
-    return { isAdmin: Boolean(isAdmin), profile: profile ?? null };
+    const role = isAdmin ? "admin" : isStaff ? "staff" : null;
+    return { role, isAdmin: Boolean(isAdmin), isStaff: Boolean(isStaff), profile: profile ?? null };
   });
 
 export const listOrders = createServerFn({ method: "GET" })
@@ -68,6 +65,21 @@ export const updateOrder = createServerFn({ method: "POST" })
     if (data.admin_note !== undefined) patch.admin_note = data.admin_note || null;
 
     const { error } = await context.supabase.from("orders").update(patch).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Только администратор может удалять заявки");
+
+    const { error } = await context.supabase.from("orders").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -125,13 +137,10 @@ export const saveProduct = createServerFn({ method: "POST" })
       return { id };
     }
 
-    const { data: created, error } = await context.supabase
-      .from("products")
-      .insert(payload)
-      .select("id")
-      .single();
+    const newId = crypto.randomUUID();
+    const { error } = await context.supabase.from("products").insert({ id: newId, ...payload });
     if (error) throw new Error(error.message);
-    return { id: created.id as string };
+    return { id: newId };
   });
 
 export const deleteProduct = createServerFn({ method: "POST" })
@@ -146,6 +155,12 @@ export const deleteProduct = createServerFn({ method: "POST" })
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+
     const { data: profiles, error } = await context.supabase
       .from("profiles")
       .select("id, email, full_name, created_at")
@@ -164,6 +179,12 @@ export const setAdminRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(input))
   .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+
     if (data.admin) {
       const { error } = await context.supabase
         .from("user_roles")
@@ -178,5 +199,22 @@ export const setAdminRole = createServerFn({ method: "POST" })
         .eq("role", "admin");
       if (error) throw new Error(error.message);
     }
+    return { ok: true };
+  });
+
+export const deleteStaffAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ user_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+    if (data.user_id === context.userId) throw new Error("Нельзя удалить свой аккаунт");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });

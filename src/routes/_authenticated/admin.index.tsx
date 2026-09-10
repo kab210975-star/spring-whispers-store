@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
-import { getMyAccess, listOrders, updateOrder } from "@/lib/admin.functions";
+import { deleteOrder, getMyAccess, listOrders, updateOrder } from "@/lib/admin.functions";
 import { formatPrice, statusLabels } from "@/lib/site";
 import type { Order, OrderStatus } from "@/lib/types";
 
@@ -28,14 +28,17 @@ function AdminOrdersPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchOrders = useServerFn(listOrders);
   const saveOrder = useServerFn(updateOrder);
+  const removeOrder = useServerFn(deleteOrder);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const canManage = access.data?.role === "admin" || access.data?.role === "staff";
+  const isAdmin = access.data?.role === "admin";
   const orders = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => fetchOrders(),
-    enabled: access.data?.isAdmin === true,
+    enabled: canManage,
   });
 
   const mutation = useMutation({
@@ -48,6 +51,15 @@ function AdminOrdersPage() {
     onError: () => toast.error("Не удалось сохранить"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => removeOrder({ data: { id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      toast.success("Заявка удалена");
+    },
+    onError: () => toast.error("Не удалось удалить заявку"),
+  });
+
   if (access.isLoading) {
     return (
       <AdminShell>
@@ -56,9 +68,9 @@ function AdminOrdersPage() {
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!canManage) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role}>
         <NoAccess />
       </AdminShell>
     );
@@ -69,7 +81,7 @@ function AdminOrdersPage() {
   );
 
   return (
-    <AdminShell>
+    <AdminShell role={access.data?.role ?? null}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl">Заявки</h1>
@@ -106,8 +118,10 @@ function AdminOrdersPage() {
             <OrderCard
               key={order.id}
               order={order}
+              isAdmin={isAdmin}
               onSave={(input) => mutation.mutate({ id: order.id, ...input })}
-              saving={mutation.isPending}
+              onDelete={() => deleteMutation.mutate(order.id)}
+              saving={mutation.isPending || deleteMutation.isPending}
             />
           ))}
         </ul>
@@ -118,11 +132,15 @@ function AdminOrdersPage() {
 
 function OrderCard({
   order,
+  isAdmin,
   onSave,
+  onDelete,
   saving,
 }: {
   order: Order;
+  isAdmin: boolean;
   onSave: (input: { status?: OrderStatus; admin_note?: string }) => void;
+  onDelete: () => void;
   saving: boolean;
 }) {
   const [note, setNote] = useState(order.admin_note ?? "");
@@ -156,18 +174,34 @@ function OrderCard({
           <p className="font-display text-xl">{formatPrice(order.total)}</p>
         </div>
 
-        <select
-          value={order.status}
-          onChange={(event) => onSave({ status: event.target.value as OrderStatus })}
-          disabled={saving}
-          className="h-10 rounded-full border border-border bg-background px-4 text-sm"
-        >
-          {statusOrder.map((status) => (
-            <option key={status} value={status}>
-              {statusLabels[status]}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={order.status}
+            onChange={(event) => onSave({ status: event.target.value as OrderStatus })}
+            disabled={saving}
+            className="h-10 rounded-full border border-border bg-background px-4 text-sm"
+          >
+            {statusOrder.map((status) => (
+              <option key={status} value={status}>
+                {statusLabels[status]}
+              </option>
+            ))}
+          </select>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Удалить заявку?")) {
+                  onDelete();
+                }
+              }}
+              disabled={saving}
+              className="h-10 rounded-full border border-destructive px-4 text-sm text-destructive hover:bg-destructive/10"
+            >
+              Удалить
+            </button>
+          )}
+        </div>
       </div>
 
       <ul className="mt-4 space-y-1 border-t border-border pt-4 text-sm">

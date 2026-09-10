@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
-import { getMyAccess, listStaff, setAdminRole } from "@/lib/admin.functions";
+import { deleteStaffAccount, getMyAccess, listStaff, setAdminRole } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/staff")({
   head: () => ({
@@ -31,13 +31,15 @@ function AdminStaffPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchStaff = useServerFn(listStaff);
   const changeRole = useServerFn(setAdminRole);
+  const remove = useServerFn(deleteStaffAccount);
   const queryClient = useQueryClient();
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const isAdmin = access.data?.role === "admin";
   const staff = useQuery({
     queryKey: ["admin", "staff"],
     queryFn: () => fetchStaff(),
-    enabled: access.data?.isAdmin === true,
+    enabled: isAdmin,
   });
 
   const mutation = useMutation({
@@ -49,6 +51,15 @@ function AdminStaffPage() {
     onError: (error: Error) => toast.error("Не удалось изменить права", { description: error.message }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (input: { user_id: string }) => remove({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+      toast.success("Аккаунт удалён");
+    },
+    onError: (error: Error) => toast.error("Не удалось удалить аккаунт", { description: error.message }),
+  });
+
   if (access.isLoading) {
     return (
       <AdminShell>
@@ -57,9 +68,9 @@ function AdminStaffPage() {
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!isAdmin) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role ?? null}>
         <NoAccess />
       </AdminShell>
     );
@@ -68,11 +79,11 @@ function AdminStaffPage() {
   const list = (staff.data ?? []) as StaffRow[];
 
   return (
-    <AdminShell>
+    <AdminShell role={access.data?.role ?? null}>
       <h1 className="font-display text-3xl">Сотрудники</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Сотрудник появляется в списке после первого входа. Полный доступ к заявкам и товарам есть только
-        у администраторов.
+        Сотрудник появляется в списке после первого входа. Управление правами и удаление заявок доступны
+        только администраторам.
       </p>
 
       {staff.isLoading ? (
@@ -97,18 +108,33 @@ function AdminStaffPage() {
                     {new Date(person.created_at).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      disabled={mutation.isPending}
-                      onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
-                      className={`h-9 rounded-full px-4 text-xs ${
-                        person.isAdmin
-                          ? "bg-primary text-primary-foreground"
-                          : "border border-border text-muted-foreground"
-                      }`}
-                    >
-                      {person.isAdmin ? "администратор" : "нет доступа"}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={mutation.isPending}
+                        onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
+                        className={`h-9 rounded-full px-4 text-xs ${
+                          person.isAdmin
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border text-muted-foreground"
+                        }`}
+                      >
+                        {person.isAdmin ? "администратор" : "нет доступа"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleteMutation.isPending || person.id === access.data?.profile?.id}
+                        onClick={() => {
+                          if (confirm(`Удалить аккаунт ${person.email ?? person.full_name ?? "сотрудника"}?`)) {
+                            deleteMutation.mutate({ user_id: person.id });
+                          }
+                        }}
+                        className="h-9 rounded-full border border-border px-4 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
+                        title="Нельзя удалить свой аккаунт"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { slugify } from "@/lib/slug";
+
 
 const PRODUCT_FIELDS =
   "id, slug, title, kind, price, color, composition, description, care_tip, image_url, in_stock, is_visible, sort_order";

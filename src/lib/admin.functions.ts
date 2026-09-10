@@ -20,17 +20,14 @@ export const registerStaff = createServerFn({ method: "POST" })
 export const getMyAccess = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    const { data: profile } = await context.supabase
-      .from("profiles")
-      .select("id, email, full_name")
-      .eq("id", context.userId)
-      .maybeSingle();
+    const [{ data: isAdmin }, { data: isStaff }, { data: profile }] = await Promise.all([
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
+      context.supabase.rpc("has_role", { _user_id: context.userId, _role: "staff" }),
+      context.supabase.from("profiles").select("id, email, full_name").eq("id", context.userId).maybeSingle(),
+    ]);
 
-    return { isAdmin: Boolean(isAdmin), profile: profile ?? null };
+    const role = isAdmin ? "admin" : isStaff ? "staff" : null;
+    return { role, isAdmin: Boolean(isAdmin), isStaff: Boolean(isStaff), profile: profile ?? null };
   });
 
 export const listOrders = createServerFn({ method: "GET" })

@@ -120,9 +120,9 @@ function AdminProductsPage() {
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!canManage) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role ?? null}>
         <NoAccess />
       </AdminShell>
     );
@@ -131,7 +131,7 @@ function AdminProductsPage() {
   const list = (products.data ?? []) as Product[];
 
   return (
-    <AdminShell>
+    <AdminShell role={access.data?.role ?? null}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl">Товары</h1>

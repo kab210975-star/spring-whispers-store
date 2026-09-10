@@ -51,15 +51,15 @@ function AdminOrdersPage() {
 
   if (access.isLoading) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role}>
         <p className="text-muted-foreground">Загружаем…</p>
       </AdminShell>
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!canManage) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role}>
         <NoAccess />
       </AdminShell>
     );

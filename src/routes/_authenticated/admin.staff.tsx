@@ -34,10 +34,11 @@ function AdminStaffPage() {
   const queryClient = useQueryClient();
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const isAdmin = access.data?.role === "admin";
   const staff = useQuery({
     queryKey: ["admin", "staff"],
     queryFn: () => fetchStaff(),
-    enabled: access.data?.isAdmin === true,
+    enabled: isAdmin,
   });
 
   const mutation = useMutation({

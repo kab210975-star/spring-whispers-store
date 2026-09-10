@@ -186,3 +186,20 @@ export const setAdminRole = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+export const deleteStaffAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ user_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Нет доступа");
+    if (data.user_id === context.userId) throw new Error("Нельзя удалить свой аккаунт");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

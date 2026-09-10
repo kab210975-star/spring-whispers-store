@@ -118,8 +118,10 @@ function AdminOrdersPage() {
             <OrderCard
               key={order.id}
               order={order}
+              isAdmin={isAdmin}
               onSave={(input) => mutation.mutate({ id: order.id, ...input })}
-              saving={mutation.isPending}
+              onDelete={() => deleteMutation.mutate(order.id)}
+              saving={mutation.isPending || deleteMutation.isPending}
             />
           ))}
         </ul>

@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
-import { deleteStaffAccount, getMyAccess, listStaff, setAdminRole } from "@/lib/admin.functions";
+import { deleteStaffAccount, getMyAccess, listStaff, setStaffRole } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/staff")({
   head: () => ({

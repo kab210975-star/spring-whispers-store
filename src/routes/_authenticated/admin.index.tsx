@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
-import { getMyAccess, listOrders, updateOrder } from "@/lib/admin.functions";
+import { deleteOrder, getMyAccess, listOrders, updateOrder } from "@/lib/admin.functions";
 import { formatPrice, statusLabels } from "@/lib/site";
 import type { Order, OrderStatus } from "@/lib/types";
 

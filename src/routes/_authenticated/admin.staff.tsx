@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
-import { deleteStaffAccount, getMyAccess, listStaff, setAdminRole } from "@/lib/admin.functions";
+import { deleteStaffAccount, getMyAccess, listStaff, setStaffRole } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/staff")({
   head: () => ({
@@ -19,18 +19,25 @@ export const Route = createFileRoute("/_authenticated/admin/staff")({
   component: AdminStaffPage,
 });
 
+type StaffRole = "admin" | "staff" | null;
+
 type StaffRow = {
   id: string;
   email: string | null;
   full_name: string | null;
   created_at: string;
-  isAdmin: boolean;
+  role: StaffRole;
+};
+
+const roleLabels: Record<"admin" | "staff", string> = {
+  admin: "администратор",
+  staff: "сотрудник",
 };
 
 function AdminStaffPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchStaff = useServerFn(listStaff);
-  const changeRole = useServerFn(setAdminRole);
+  const changeRole = useServerFn(setStaffRole);
   const remove = useServerFn(deleteStaffAccount);
   const queryClient = useQueryClient();
 
@@ -43,13 +50,14 @@ function AdminStaffPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (input: { user_id: string; admin: boolean }) => changeRole({ data: input }),
+    mutationFn: (input: { user_id: string; role: StaffRole }) => changeRole({ data: input }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
       toast.success("Права обновлены");
     },
     onError: (error: Error) => toast.error("Не удалось изменить права", { description: error.message }),
   });
+
 
   const deleteMutation = useMutation({
     mutationFn: (input: { user_id: string }) => remove({ data: input }),
@@ -96,7 +104,8 @@ function AdminStaffPage() {
                 <th className="px-5 py-4">Сотрудник</th>
                 <th className="px-5 py-4">Почта</th>
                 <th className="px-5 py-4">Добавлен</th>
-                <th className="px-5 py-4">Доступ</th>
+                <th className="px-5 py-4">Роль</th>
+                <th className="px-5 py-4">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -108,19 +117,58 @@ function AdminStaffPage() {
                     {new Date(person.created_at).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={mutation.isPending}
-                        onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
-                        className={`h-9 rounded-full px-4 text-xs ${
-                          person.isAdmin
-                            ? "bg-primary text-primary-foreground"
+                    <span
+                      className={`inline-flex h-8 items-center rounded-full px-4 text-xs ${
+                        person.role === "admin"
+                          ? "bg-primary text-primary-foreground"
+                          : person.role === "staff"
+                            ? "border border-primary/40 text-primary"
                             : "border border-border text-muted-foreground"
-                        }`}
-                      >
-                        {person.isAdmin ? "администратор" : "нет доступа"}
-                      </button>
+                      }`}
+                    >
+                      {person.role ? roleLabels[person.role] : "нет доступа"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {person.role === null && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => mutation.mutate({ user_id: person.id, role: "staff" })}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Дать доступ сотрудника
+                        </button>
+                      )}
+                      {person.role === "staff" && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Сделать ${person.email ?? "сотрудника"} администратором?`)) {
+                              mutation.mutate({ user_id: person.id, role: "admin" });
+                            }
+                          }}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Сделать администратором
+                        </button>
+                      )}
+                      {person.role === "admin" && person.id !== access.data?.profile?.id && (
+                        <button
+                          type="button"
+                          disabled={mutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Снять права администратора у ${person.email ?? "сотрудника"}?`)) {
+                              mutation.mutate({ user_id: person.id, role: "staff" });
+                            }
+                          }}
+                          className="h-9 rounded-full border border-border px-4 text-xs hover:bg-accent disabled:opacity-50"
+                        >
+                          Снять права администратора
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={deleteMutation.isPending || person.id === access.data?.profile?.id}
@@ -138,6 +186,7 @@ function AdminStaffPage() {
                   </td>
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>

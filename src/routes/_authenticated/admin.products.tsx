@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
 import { deleteProduct, getMyAccess, listAllProducts, saveProduct } from "@/lib/admin.functions";
 import { formatPrice, kindLabels } from "@/lib/site";
+import { slugify } from "@/lib/slug";
 import type { Product, ProductKind } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/admin/products")({
@@ -258,19 +259,28 @@ function ProductForm({
           <input
             required
             value={draft.title}
-            onChange={(e) => onChange({ ...draft, title: e.target.value })}
+            onChange={(e) =>
+              onChange({
+                ...draft,
+                title: e.target.value,
+                slug: draft.id ? draft.slug : slugify(e.target.value),
+              })
+            }
             className={field}
           />
         </label>
         <label className="text-sm">
-          <span className="mb-1.5 block text-muted-foreground">Адрес страницы (латиница)</span>
+          <span className="mb-1.5 block text-muted-foreground">
+            Адрес страницы — заполняется автоматически, можно изменить
+          </span>
           <input
-            required
             value={draft.slug}
             onChange={(e) => onChange({ ...draft, slug: e.target.value })}
+            placeholder="pervyy-sneg"
             className={field}
           />
         </label>
+
         <label className="text-sm">
           <span className="mb-1.5 block text-muted-foreground">Тип</span>
           <select

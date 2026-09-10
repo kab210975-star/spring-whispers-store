@@ -32,10 +32,11 @@ function AdminOrdersPage() {
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
+  const canManage = access.data?.role === "admin" || access.data?.role === "staff";
   const orders = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => fetchOrders(),
-    enabled: access.data?.isAdmin === true,
+    enabled: canManage,
   });
 
   const mutation = useMutation({

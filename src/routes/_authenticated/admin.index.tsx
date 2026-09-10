@@ -132,11 +132,15 @@ function AdminOrdersPage() {
 
 function OrderCard({
   order,
+  isAdmin,
   onSave,
+  onDelete,
   saving,
 }: {
   order: Order;
+  isAdmin: boolean;
   onSave: (input: { status?: OrderStatus; admin_note?: string }) => void;
+  onDelete: () => void;
   saving: boolean;
 }) {
   const [note, setNote] = useState(order.admin_note ?? "");

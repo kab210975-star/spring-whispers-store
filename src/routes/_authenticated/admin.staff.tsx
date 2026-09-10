@@ -31,6 +31,7 @@ function AdminStaffPage() {
   const fetchAccess = useServerFn(getMyAccess);
   const fetchStaff = useServerFn(listStaff);
   const changeRole = useServerFn(setAdminRole);
+  const remove = useServerFn(deleteStaffAccount);
   const queryClient = useQueryClient();
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
@@ -48,6 +49,15 @@ function AdminStaffPage() {
       toast.success("Права обновлены");
     },
     onError: (error: Error) => toast.error("Не удалось изменить права", { description: error.message }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (input: { user_id: string }) => remove({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+      toast.success("Аккаунт удалён");
+    },
+    onError: (error: Error) => toast.error("Не удалось удалить аккаунт", { description: error.message }),
   });
 
   if (access.isLoading) {

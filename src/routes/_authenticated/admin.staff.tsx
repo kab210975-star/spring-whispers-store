@@ -108,18 +108,33 @@ function AdminStaffPage() {
                     {new Date(person.created_at).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      disabled={mutation.isPending}
-                      onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
-                      className={`h-9 rounded-full px-4 text-xs ${
-                        person.isAdmin
-                          ? "bg-primary text-primary-foreground"
-                          : "border border-border text-muted-foreground"
-                      }`}
-                    >
-                      {person.isAdmin ? "администратор" : "нет доступа"}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={mutation.isPending}
+                        onClick={() => mutation.mutate({ user_id: person.id, admin: !person.isAdmin })}
+                        className={`h-9 rounded-full px-4 text-xs ${
+                          person.isAdmin
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border text-muted-foreground"
+                        }`}
+                      >
+                        {person.isAdmin ? "администратор" : "нет доступа"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleteMutation.isPending || person.id === access.data?.profile?.id}
+                        onClick={() => {
+                          if (confirm(`Удалить аккаунт ${person.email ?? person.full_name ?? "сотрудника"}?`)) {
+                            deleteMutation.mutate({ user_id: person.id });
+                          }
+                        }}
+                        className="h-9 rounded-full border border-border px-4 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
+                        title="Нельзя удалить свой аккаунт"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

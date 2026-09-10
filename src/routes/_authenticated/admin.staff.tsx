@@ -58,9 +58,9 @@ function AdminStaffPage() {
     );
   }
 
-  if (!access.data?.isAdmin) {
+  if (!isAdmin) {
     return (
-      <AdminShell>
+      <AdminShell role={access.data?.role ?? null}>
         <NoAccess />
       </AdminShell>
     );

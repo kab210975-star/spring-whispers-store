@@ -174,18 +174,34 @@ function OrderCard({
           <p className="font-display text-xl">{formatPrice(order.total)}</p>
         </div>
 
-        <select
-          value={order.status}
-          onChange={(event) => onSave({ status: event.target.value as OrderStatus })}
-          disabled={saving}
-          className="h-10 rounded-full border border-border bg-background px-4 text-sm"
-        >
-          {statusOrder.map((status) => (
-            <option key={status} value={status}>
-              {statusLabels[status]}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={order.status}
+            onChange={(event) => onSave({ status: event.target.value as OrderStatus })}
+            disabled={saving}
+            className="h-10 rounded-full border border-border bg-background px-4 text-sm"
+          >
+            {statusOrder.map((status) => (
+              <option key={status} value={status}>
+                {statusLabels[status]}
+              </option>
+            ))}
+          </select>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Удалить заявку?")) {
+                  onDelete();
+                }
+              }}
+              disabled={saving}
+              className="h-10 rounded-full border border-destructive px-4 text-sm text-destructive hover:bg-destructive/10"
+            >
+              Удалить
+            </button>
+          )}
+        </div>
       </div>
 
       <ul className="mt-4 space-y-1 border-t border-border pt-4 text-sm">

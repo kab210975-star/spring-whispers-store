@@ -98,13 +98,8 @@ export const listAllProducts = createServerFn({ method: "GET" })
 
 const productSchema = z.object({
   id: z.string().uuid().optional().nullable(),
-  slug: z
-    .string()
-    .trim()
-    .min(2)
-    .max(80)
-    .regex(/^[a-z0-9-]+$/, "Только латиница, цифры и дефис"),
-  title: z.string().trim().min(2).max(160),
+  slug: z.string().trim().max(80).optional().nullable(),
+  title: z.string().trim().min(2, "Название слишком короткое").max(160),
   kind: z.enum(["bouquet", "single", "gift"]),
   price: z.number().min(0).max(1000000),
   color: z.string().trim().max(80).optional().nullable(),
@@ -121,7 +116,7 @@ export const saveProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => productSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { id, ...values } = data;
+    const { id, slug, ...values } = data;
     const payload = {
       ...values,
       color: values.color || null,
@@ -131,17 +126,48 @@ export const saveProduct = createServerFn({ method: "POST" })
       image_url: values.image_url || null,
     };
 
+    const baseSlug = slugify(slug || values.title);
+
+    // Подбираем свободный адрес страницы, чтобы не падать на дубликате.
+    const { data: taken } = await context.supabase
+      .from("products")
+      .select("id, slug")
+      .like("slug", `${baseSlug}%`);
+
+    const busy = new Set((taken ?? []).filter((row) => row.id !== id).map((row) => row.slug));
+    let finalSlug = baseSlug;
+    let counter = 2;
+    while (busy.has(finalSlug)) {
+      finalSlug = `${baseSlug}-${counter}`;
+      counter += 1;
+    }
+
     if (id) {
-      const { error } = await context.supabase.from("products").update(payload).eq("id", id);
-      if (error) throw new Error(error.message);
-      return { id };
+      const { error } = await context.supabase
+        .from("products")
+        .update({ ...payload, slug: finalSlug })
+        .eq("id", id);
+      if (error) throw new Error(friendlyProductError(error.message));
+      return { id, slug: finalSlug };
     }
 
     const newId = crypto.randomUUID();
-    const { error } = await context.supabase.from("products").insert({ id: newId, ...payload });
-    if (error) throw new Error(error.message);
-    return { id: newId };
+    const { error } = await context.supabase
+      .from("products")
+      .insert({ id: newId, ...payload, slug: finalSlug });
+    if (error) throw new Error(friendlyProductError(error.message));
+    return { id: newId, slug: finalSlug };
   });
+
+function friendlyProductError(message: string): string {
+  if (message.includes("products_slug_key") || message.includes("duplicate key")) {
+    return "Товар с таким адресом страницы уже есть — попробуйте другое название";
+  }
+  if (message.includes("row-level security")) {
+    return "Недостаточно прав для изменения каталога";
+  }
+  return message;
+}
 
 export const deleteProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -151,6 +177,7 @@ export const deleteProduct = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

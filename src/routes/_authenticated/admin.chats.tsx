@@ -6,7 +6,8 @@ import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
 import { getMyAccess } from "@/lib/admin.functions";
-import { getChat, listChatCatalog, listChats, replyToChat, setChatStatus, uploadOperatorImage } from "@/lib/chat-admin.functions";
+import { createOrderFromChat, getChat, listChatCatalog, listChats, replyToChat, setChatStatus, uploadOperatorImage } from "@/lib/chat-admin.functions";
+import { deliverySlots, formatPrice } from "@/lib/site";
 import { asAttachments, chatImageUrl, type ImageAttachment } from "@/lib/chat-attachments";
 import { ChatAttachments } from "@/components/site/ChatAttachments";
 import { fileToBase64 } from "@/lib/file-base64";
@@ -120,9 +121,17 @@ function ChatDetail({ id }: { id: string }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [q, setQ] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [orderItems, setOrderItems] = useState<Record<string, number>>({});
+  const [orderDate, setOrderDate] = useState("");
+  const [orderSlot, setOrderSlot] = useState("");
+  const [orderAddress, setOrderAddress] = useState("");
+  const [orderCard, setOrderCard] = useState("");
+  const [orderComment, setOrderComment] = useState("");
   const fetchCatalog = useServerFn(listChatCatalog);
   const uploadImg = useServerFn(uploadOperatorImage);
-  const catalog = useQuery({ queryKey: ["admin", "chat-catalog"], queryFn: () => fetchCatalog(), enabled: pickerOpen });
+  const createOrder = useServerFn(createOrderFromChat);
+  const catalog = useQuery({ queryKey: ["admin", "chat-catalog"], queryFn: () => fetchCatalog(), enabled: pickerOpen || orderOpen });
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     setUploading(true);

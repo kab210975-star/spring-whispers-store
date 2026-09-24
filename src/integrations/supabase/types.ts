@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       chat_messages: {
         Row: {
+          attachments: Json
           content: string
           created_at: string
           id: string
@@ -23,6 +24,7 @@ export type Database = {
           session_id: string
         }
         Insert: {
+          attachments?: Json
           content: string
           created_at?: string
           id?: string
@@ -30,6 +32,7 @@ export type Database = {
           session_id: string
         }
         Update: {
+          attachments?: Json
           content?: string
           created_at?: string
           id?: string

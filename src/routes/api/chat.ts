@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, stepCountIs, streamText, tool, type ModelMessage, type UIMessage } from "ai";
+import { stepCountIs, streamText, tool, type ModelMessage, type UIMessage } from "ai";
 import { z } from "zod";
 
 import { createLovableResponses } from "@/lib/ai-gateway.server";
+import { asAttachments, type Attachment, type BouquetCard, type ProductCard } from "@/lib/chat-attachments";
+import { imageSchema } from "@/lib/chat.functions";
+import { chatImageDataUrl } from "@/lib/chat-upload.server";
 import { deliveryCost, deliverySlots, site } from "@/lib/site";
 
-type Body = { token?: unknown; message?: unknown };
+type Body = { token?: unknown; message?: unknown; images?: unknown };
 
 const kindRu: Record<string, string> = { bouquet: "букет", single: "поштучно", gift: "подарок" };
 
@@ -24,7 +27,9 @@ export const Route = createFileRoute("/api/chat")({
           .join("")
           .trim()
           .slice(0, 4000);
-        if (!userText) return new Response("Пустое сообщение", { status: 400 });
+        const imgParse = z.array(imageSchema).max(4).safeParse(body.images ?? []);
+        if (!imgParse.success) return new Response("Некорректные вложения", { status: 400 });
+        if (!userText && imgParse.data.length === 0) return new Response("Пустое сообщение", { status: 400 });
 
         const key = process.env["LOVABLE_API_KEY"];
         if (!key) return new Response("ИИ не настроен", { status: 500 });
@@ -36,6 +41,7 @@ export const Route = createFileRoute("/api/chat")({
           .eq("token", token)
           .maybeSingle();
         if (!session) return new Response("Чат не найден", { status: 404 });
+        const images = imgParse.data.filter((i) => i.path.startsWith(`${session.id}/`));
         if (session.status !== "ai") {
           return new Response("Чат ведёт оператор", { status: 409 });
         }
@@ -43,20 +49,20 @@ export const Route = createFileRoute("/api/chat")({
         const [{ data: history }, { data: products }] = await Promise.all([
           db
             .from("chat_messages")
-            .select("role, content")
+            .select("role, content, attachments")
             .eq("session_id", session.id)
             .order("created_at", { ascending: true })
             .limit(80),
           db
             .from("products")
-            .select("id, slug, title, kind, price, color, composition, description, in_stock")
+            .select("id, slug, title, kind, price, color, composition, description, in_stock, image_url")
             .eq("is_visible", true)
             .order("sort_order", { ascending: true }),
         ]);
 
         const { error: saveErr } = await db
           .from("chat_messages")
-          .insert({ session_id: session.id, role: "user", content: userText });
+          .insert({ session_id: session.id, role: "user", content: userText, attachments: images });
         if (saveErr) return new Response("Не удалось сохранить сообщение", { status: 500 });
         await db.from("chat_sessions").update({ updated_at: new Date().toISOString() }).eq("id", session.id);
 
@@ -71,7 +77,9 @@ export const Route = createFileRoute("/api/chat")({
         const system = `Ты — флорист-консультант магазина «${site.name}» (тюльпаны, ${site.deliveryZone}). Общайся по-русски, тепло, коротко, на «вы». Покупателя зовут ${session.customer_name}.
 Работай ТОЛЬКО с товарами из каталога ниже, не выдумывай товары и цены. Товары «нет в наличии» не предлагай.
 Помогай выбрать готовый букет (повод, бюджет, цвет) или собрать свой из тюльпанов поштучно и подарков.
-Любые суммы считай только инструментом calculate_bouquet.
+Любые суммы считай только инструментом calculate_bouquet — покупатель увидит карточку сборки с фото и итогом.
+Когда предлагаешь конкретные товары из каталога, ОБЯЗАТЕЛЬНО вызови show_products с их slug — покупатель увидит карточки с фото и ценой. Не перечисляй товары без показа.
+Если покупатель прислал фото букета — опиши, что видишь (цвет, количество, стиль), и подбери максимально похожий вариант из каталога или собери такой из тюльпанов поштучно.
 Доставка: ${site.deliveryPrice} ₽ в пределах МКАД, бесплатно от ${site.freeDeliveryFrom} ₽; до 20 км за МКАД +300 ₽; интервалы: ${deliverySlots.join(", ")}.
 Оформление: когда покупатель выбрал состав — уточни дату, интервал, адрес, текст открытки (по желанию), покажи итог с суммой и спроси явное подтверждение. Только после слов «да/подтверждаю/оформляйте» вызови create_order. Имя и телефон уже есть: ${session.customer_name}, ${session.phone}.
 ${session.order_id ? "В этом чате уже оформлена заявка." : ""}
@@ -80,12 +88,45 @@ ${session.order_id ? "В этом чате уже оформлена заявк�
 Каталог (slug | название | тип | цена | наличие):
 ${catalogText}`;
 
-        const past: ModelMessage[] = (history ?? []).map((m) =>
-          m.role === "user"
-            ? { role: "user", content: m.content }
-            : { role: "assistant", content: m.role === "operator" ? `[Оператор магазина]: ${m.content}` : m.content },
-        );
-        const current = await convertToModelMessages([message]);
+        const describe = (att: Attachment[]) =>
+          att
+            .map((a) =>
+              a.type === "product"
+                ? `[показан товар: ${a.title}, ${a.price} ₽]`
+                : a.type === "bouquet"
+                  ? `[показана сборка: ${a.items.map((i) => `${i.title} ×${i.quantity}`).join(", ")}; итого ${a.total} ₽]`
+                  : "",
+            )
+            .filter(Boolean)
+            .join(" ");
+        const rows = history ?? [];
+        const imageBudget = { left: 6 };
+        const userParts = async (text: string, att: Attachment[]) => {
+          const parts: ({ type: "text"; text: string } | { type: "image"; image: URL })[] = [];
+          if (text) parts.push({ type: "text", text });
+          for (const a of att) {
+            if (a.type !== "image" || imageBudget.left <= 0) continue;
+            const url = await chatImageDataUrl(a.path, a.mime);
+            if (url) {
+              imageBudget.left--;
+              parts.push({ type: "image", image: new URL(url) });
+            }
+          }
+          if (!parts.length) parts.push({ type: "text", text: "(фото)" });
+          return parts;
+        };
+        const current: ModelMessage = { role: "user", content: await userParts(userText, images) };
+        const past: ModelMessage[] = [];
+        for (const m of rows) {
+          const att = asAttachments(m.attachments);
+          if (m.role === "user") {
+            past.push({ role: "user", content: await userParts(m.content, att) });
+          } else {
+            const txt = `${m.role === "operator" ? "[Оператор магазина]: " : ""}${m.content} ${describe(att)}`.trim();
+            past.push({ role: "assistant", content: txt || "…" });
+          }
+        }
+        const shown: Attachment[] = [];
 
         const findItems = (items: { slug: string; quantity: number }[]) => {
           const lines = items.map((i) => {
@@ -107,7 +148,7 @@ ${catalogText}`;
         const result = streamText({
           model: lovable.responses("openai/gpt-6-astra"),
           system,
-          messages: [...past, ...current],
+          messages: [...past, current],
           stopWhen: stepCountIs(50),
           tools: {
             calculate_bouquet: tool({
@@ -119,7 +160,22 @@ ${catalogText}`;
               execute: async ({ items, outside_mkad }) => {
                 const { ok, missing, subtotal } = findItems(items);
                 const delivery = deliveryCost(subtotal) + (outside_mkad ? 300 : 0);
+                const card: BouquetCard = {
+                  type: "bouquet",
+                  items: ok.map((l) => ({
+                    slug: l.product.slug,
+                    title: l.product.title,
+                    price: l.product.price,
+                    quantity: l.quantity,
+                    image_url: l.product.image_url,
+                  })),
+                  subtotal,
+                  delivery,
+                  total: subtotal + delivery,
+                };
+                if (ok.length) shown.push(card);
                 return {
+                  card,
                   lines: ok.map((l) => ({
                     title: l.product.title,
                     price: l.product.price,
@@ -132,6 +188,28 @@ ${catalogText}`;
                   delivery,
                   total: subtotal + delivery,
                 };
+              },
+            }),
+            show_products: tool({
+              description: "Показать покупателю карточки товаров из каталога (фото, название, цена).",
+              inputSchema: z.object({ slugs: z.array(z.string()).describe("slug товаров, до 6") }),
+              execute: async ({ slugs }) => {
+                const cards: ProductCard[] = slugs
+                  .slice(0, 6)
+                  .map((slug) => catalog.find((c) => c.slug === slug))
+                  .filter((p): p is NonNullable<typeof p> => !!p)
+                  .map((p) => ({
+                    type: "product",
+                    product_id: p.id,
+                    slug: p.slug,
+                    title: p.title,
+                    price: p.price,
+                    kind: p.kind,
+                    in_stock: p.in_stock,
+                    image_url: p.image_url,
+                  }));
+                shown.push(...cards);
+                return { cards, shown: cards.length };
               },
             }),
             create_order: tool({
@@ -213,10 +291,10 @@ ${catalogText}`;
               .map((p) => (p.type === "text" ? p.text : ""))
               .join("\n")
               .trim();
-            if (!text) return;
+            if (!text && !shown.length) return;
             const { error } = await db
               .from("chat_messages")
-              .insert({ session_id: session.id, role: "assistant", content: text });
+              .insert({ session_id: session.id, role: "assistant", content: text, attachments: shown });
             if (error) console.error("chat save failed", error);
           },
           onError: (error) => {

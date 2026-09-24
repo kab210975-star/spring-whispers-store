@@ -1,9 +1,21 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { listChats } from "@/lib/chat-admin.functions";
 import { site } from "@/lib/site";
+
+function ChatBadge() {
+  const fetchChats = useServerFn(listChats);
+  const chats = useQuery({ queryKey: ["admin", "chats"], queryFn: () => fetchChats(), refetchInterval: 15000 });
+  const n = (chats.data ?? []).filter((c) => c.needs_operator).length;
+  if (!n) return null;
+  return (
+    <span className="rounded-full bg-destructive px-1.5 text-[11px] text-destructive-foreground">{n}</span>
+  );
+}
 
 export function AdminShell({
   children,
@@ -47,6 +59,14 @@ export function AdminShell({
               className="text-muted-foreground hover:text-primary"
             >
               Товары
+            </Link>
+            <Link
+              to="/admin/chats"
+              activeProps={{ className: "text-primary" }}
+              className="flex items-center gap-1 text-muted-foreground hover:text-primary"
+            >
+              Чаты
+              <ChatBadge />
             </Link>
             {isAdmin && (
               <Link

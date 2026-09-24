@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CartProvider } from "../lib/cart";
 import { Toaster } from "../components/ui/sonner";
 import { ThemeToggle } from "../components/site/ThemeToggle";
+import { ChatWidget } from "../components/site/ChatWidget";
 
 function NotFoundComponent() {
   return (
@@ -140,6 +141,7 @@ function RootComponent() {
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <ThemeToggle />
+        <ChatWidget />
         <Toaster position="top-center" />
       </CartProvider>
     </QueryClientProvider>

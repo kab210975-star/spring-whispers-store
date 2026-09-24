@@ -17,9 +17,11 @@ import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as OfferRouteImport } from './routes/offer'
 import { Route as OrderAcceptedRouteImport } from './routes/order-accepted'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as CatalogIndexRouteImport } from './routes/catalog.index'
 import { Route as CatalogSlugRouteImport } from './routes/catalog.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminChatsRouteImport } from './routes/_authenticated/admin.chats'
 import { Route as AuthenticatedAdminProductsRouteImport } from './routes/_authenticated/admin.products'
 import { Route as AuthenticatedAdminStaffRouteImport } from './routes/_authenticated/admin.staff'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image.$'
@@ -63,6 +65,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CatalogIndexRoute = CatalogIndexRouteImport.update({
   id: '/catalog/',
   path: '/catalog/',
@@ -76,6 +83,11 @@ const CatalogSlugRoute = CatalogSlugRouteImport.update({
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminChatsRoute = AuthenticatedAdminChatsRouteImport.update({
+  id: '/admin/chats',
+  path: '/admin/chats',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAdminProductsRoute =
@@ -104,8 +116,10 @@ export interface FileRoutesByFullPath {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
+  '/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/staff': typeof AuthenticatedAdminStaffRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -119,8 +133,10 @@ export interface FileRoutesByTo {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog': typeof CatalogIndexRoute
+  '/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/staff': typeof AuthenticatedAdminStaffRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -136,8 +152,10 @@ export interface FileRoutesById {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
+  '/_authenticated/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
   '/_authenticated/admin/staff': typeof AuthenticatedAdminStaffRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -153,8 +171,10 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog/'
+    | '/admin/chats'
     | '/admin/products'
     | '/admin/staff'
     | '/admin/'
@@ -168,8 +188,10 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog'
+    | '/admin/chats'
     | '/admin/products'
     | '/admin/staff'
     | '/admin'
@@ -184,8 +206,10 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog/'
+    | '/_authenticated/admin/chats'
     | '/_authenticated/admin/products'
     | '/_authenticated/admin/staff'
     | '/_authenticated/admin/'
@@ -201,6 +225,7 @@ export interface RootRouteChildren {
   OfferRoute: typeof OfferRoute
   OrderAcceptedRoute: typeof OrderAcceptedRoute
   PrivacyRoute: typeof PrivacyRoute
+  ApiChatRoute: typeof ApiChatRoute
   CatalogSlugRoute: typeof CatalogSlugRoute
   CatalogIndexRoute: typeof CatalogIndexRoute
   ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
@@ -264,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/catalog/': {
       id: '/catalog/'
       path: '/catalog'
@@ -283,6 +315,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/chats': {
+      id: '/_authenticated/admin/chats'
+      path: '/admin/chats'
+      fullPath: '/admin/chats'
+      preLoaderRoute: typeof AuthenticatedAdminChatsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/products': {
@@ -310,12 +349,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminChatsRoute: typeof AuthenticatedAdminChatsRoute
   AuthenticatedAdminProductsRoute: typeof AuthenticatedAdminProductsRoute
   AuthenticatedAdminStaffRoute: typeof AuthenticatedAdminStaffRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminChatsRoute: AuthenticatedAdminChatsRoute,
   AuthenticatedAdminProductsRoute: AuthenticatedAdminProductsRoute,
   AuthenticatedAdminStaffRoute: AuthenticatedAdminStaffRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
@@ -333,6 +374,7 @@ const rootRouteChildren: RootRouteChildren = {
   OfferRoute: OfferRoute,
   OrderAcceptedRoute: OrderAcceptedRoute,
   PrivacyRoute: PrivacyRoute,
+  ApiChatRoute: ApiChatRoute,
   CatalogSlugRoute: CatalogSlugRoute,
   CatalogIndexRoute: CatalogIndexRoute,
   ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,

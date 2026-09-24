@@ -256,6 +256,21 @@ function AdminProductsPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        setDraft({
+                          ...toDraft(product),
+                          id: null,
+                          title: `${product.title} (копия)`,
+                          slug: slugify(`${product.title} kopiya`),
+                        });
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="ml-4 text-muted-foreground hover:text-primary"
+                    >
+                      Дублировать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         if (window.confirm(`Удалить «${product.title}»?`)) drop.mutate(product.id);
                       }}
                       className="ml-4 text-muted-foreground hover:text-destructive"

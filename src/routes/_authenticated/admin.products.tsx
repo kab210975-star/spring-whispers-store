@@ -347,15 +347,14 @@ function ProductForm({
             className={field}
           />
         </label>
-        <label className="text-sm sm:col-span-2">
-          <span className="mb-1.5 block text-muted-foreground">Ссылка на фото</span>
-          <input
+        <div className="text-sm sm:col-span-2">
+          <span className="mb-1.5 block text-muted-foreground">Фото товара</span>
+          <PhotoUploader
+            slug={draft.slug}
             value={draft.image_url}
-            onChange={(e) => onChange({ ...draft, image_url: e.target.value })}
-            placeholder="https://…"
-            className={field}
+            onChange={(url) => onChange({ ...draft, image_url: url })}
           />
-        </label>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-6 text-sm">

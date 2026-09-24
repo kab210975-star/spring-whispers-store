@@ -131,3 +131,80 @@ export const setChatStatus = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** Оформление заявки оператором прямо из чата. */
+export const createOrderFromChat = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        items: z.array(z.object({ product_id: z.string().uuid(), quantity: z.number().int().min(1).max(200) })).min(1).max(30),
+        delivery_date: z.string().max(10).nullable(),
+        delivery_slot: z.string().max(40).nullable(),
+        address: z.string().max(400).nullable(),
+        card_text: z.string().max(1000).nullable(),
+        comment: z.string().max(1000).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context);
+    const { data: session } = await context.supabase
+      .from("chat_sessions")
+      .select("id, customer_name, phone, order_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!session) throw new Error("Чат не найден");
+    if (session.order_id) throw new Error("Заявка по этому чату уже оформлена");
+
+    const ids = data.items.map((i) => i.product_id);
+    const { data: prods } = await context.supabase
+      .from("products")
+      .select("id, title, price")
+      .in("id", ids);
+    const byId = new Map((prods ?? []).map((p) => [p.id, p]));
+    const lines = data.items
+      .map((i) => {
+        const p = byId.get(i.product_id);
+        return p ? { product: p, quantity: i.quantity } : null;
+      })
+      .filter((l): l is NonNullable<typeof l> => l !== null);
+    if (lines.length === 0) throw new Error("Товары не найдены");
+    const subtotal = lines.reduce((s, l) => s + Number(l.product.price) * l.quantity, 0);
+
+    const { randomUUID } = await import("node:crypto");
+    const orderId = randomUUID();
+    const date = data.delivery_date && /^\d{4}-\d{2}-\d{2}$/.test(data.delivery_date) ? data.delivery_date : null;
+    const { error } = await context.supabase.from("orders").insert({
+      id: orderId,
+      customer_name: session.customer_name,
+      phone: session.phone,
+      delivery_date: date,
+      delivery_slot: data.delivery_slot || null,
+      address: data.address || null,
+      card_text: data.card_text || null,
+      comment: `Оформлено оператором из чата. ${data.comment ?? ""}`.slice(0, 1000),
+      total: subtotal,
+    });
+    if (error) throw new Error("Не удалось сохранить заявку");
+    const { error: itemsErr } = await context.supabase.from("order_items").insert(
+      lines.map((l) => ({
+        order_id: orderId,
+        product_id: l.product.id,
+        title: l.product.title,
+        price: Number(l.product.price),
+        quantity: l.quantity,
+      })),
+    );
+    if (itemsErr) throw new Error("Не удалось сохранить состав заявки");
+    await context.supabase.from("chat_sessions").update({ order_id: orderId, updated_at: new Date().toISOString() }).eq("id", data.id);
+
+    const summary = lines.map((l) => `${l.product.title} ×${l.quantity}`).join(", ");
+    await context.supabase.from("chat_messages").insert({
+      session_id: data.id,
+      role: "operator",
+      content: `Заявка оформлена: ${summary}. Итого ${subtotal} ₽ (без учёта доставки). Мы позвоним, чтобы подтвердить время.`,
+    });
+    return { ok: true, order_number: orderId.slice(0, 8), subtotal };
+  });

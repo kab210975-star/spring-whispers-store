@@ -62,7 +62,7 @@ export const setChatStatus = createServerFn({ method: "POST" })
       .from("chat_sessions")
       .update({
         status: data.status,
-        needs_operator: data.status === "operator" ? undefined : false,
+        ...(data.status === "operator" ? {} : { needs_operator: false }),
         updated_at: new Date().toISOString(),
       })
       .eq("id", data.id);

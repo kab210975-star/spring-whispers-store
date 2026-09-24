@@ -14,6 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          created_at: string
+          customer_name: string
+          id: string
+          needs_operator: boolean
+          operator_reason: string | null
+          order_id: string | null
+          pd_consent_at: string
+          phone: string
+          privacy_accepted_at: string
+          status: Database["public"]["Enums"]["chat_status"]
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          id?: string
+          needs_operator?: boolean
+          operator_reason?: string | null
+          order_id?: string | null
+          pd_consent_at: string
+          phone: string
+          privacy_accepted_at: string
+          status?: Database["public"]["Enums"]["chat_status"]
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          id?: string
+          needs_operator?: boolean
+          operator_reason?: string | null
+          order_id?: string | null
+          pd_consent_at?: string
+          phone?: string
+          privacy_accepted_at?: string
+          status?: Database["public"]["Enums"]["chat_status"]
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -219,6 +304,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff"
+      chat_status: "ai" | "operator" | "closed"
       order_status: "new" | "in_progress" | "delivered" | "cancelled"
       product_kind: "bouquet" | "single" | "gift"
     }
@@ -349,6 +435,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff"],
+      chat_status: ["ai", "operator", "closed"],
       order_status: ["new", "in_progress", "delivered", "cancelled"],
       product_kind: ["bouquet", "single", "gift"],
     },

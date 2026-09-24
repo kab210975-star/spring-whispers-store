@@ -26,5 +26,5 @@ const bySlug: Record<string, string> = {
 };
 
 export function productImage(product: { slug: string; image_url?: string | null }): string {
-  return bySlug[product.slug] ?? product.image_url ?? hero;
+  return product.image_url || bySlug[product.slug] || hero;
 }

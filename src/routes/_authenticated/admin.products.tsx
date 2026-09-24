@@ -5,7 +5,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
+import { supabase } from "@/integrations/supabase/client";
 import { deleteProduct, getMyAccess, listAllProducts, saveProduct } from "@/lib/admin.functions";
+import { productImage } from "@/lib/product-images";
 import { formatPrice, kindLabels } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 import type { Product, ProductKind } from "@/lib/types";
@@ -80,6 +82,9 @@ function AdminProductsPage() {
   const remove = useServerFn(deleteProduct);
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<ProductKind | "all">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "out">("all");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
   const canManage = access.data?.role === "admin" || access.data?.role === "staff";
@@ -129,14 +134,25 @@ function AdminProductsPage() {
     );
   }
 
-  const list = (products.data ?? []) as Product[];
+  const all = (products.data ?? []) as Product[];
+  const q = search.trim().toLowerCase();
+  const list = all.filter(
+    (p) =>
+      (kindFilter === "all" || p.kind === kindFilter) &&
+      (stockFilter === "all" || (stockFilter === "in" ? p.in_stock : !p.in_stock)) &&
+      (!q || p.title.toLowerCase().includes(q)),
+  );
+  const chip = (active: boolean) =>
+    `h-9 rounded-full px-4 text-sm ${active ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`;
 
   return (
     <AdminShell role={access.data?.role ?? null}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl">Товары</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Всего позиций: {list.length}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Всего позиций: {all.length}, показано: {list.length}
+          </p>
         </div>
         <button
           type="button"
@@ -145,6 +161,25 @@ function AdminProductsPage() {
         >
           Добавить товар
         </button>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по названию"
+          className="h-9 w-56 rounded-full border border-border bg-background px-4 text-sm"
+        />
+        {(["all", "bouquet", "single", "gift"] as const).map((k) => (
+          <button key={k} type="button" onClick={() => setKindFilter(k)} className={chip(kindFilter === k)}>
+            {k === "all" ? "Все типы" : kindLabels[k]}
+          </button>
+        ))}
+        {(["all", "in", "out"] as const).map((s) => (
+          <button key={s} type="button" onClick={() => setStockFilter(s)} className={chip(stockFilter === s)}>
+            {s === "all" ? "Любое наличие" : s === "in" ? "В наличии" : "Нет в наличии"}
+          </button>
+        ))}
       </div>
 
       {draft && (
@@ -176,8 +211,17 @@ function AdminProductsPage() {
               {list.map((product) => (
                 <tr key={product.id} className="border-b border-border/60 last:border-0">
                   <td className="px-5 py-4">
-                    <p className="font-medium">{product.title}</p>
-                    <p className="text-xs text-muted-foreground">{product.slug}</p>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={productImage(product)}
+                        alt=""
+                        className="h-12 w-12 rounded-lg object-cover"
+                      />
+                      <div>
+                        <p className="font-medium">{product.title}</p>
+                        <p className="text-xs text-muted-foreground">{product.slug}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-4 text-muted-foreground">{kindLabels[product.kind]}</td>
                   <td className="px-5 py-4">{formatPrice(product.price)}</td>
@@ -208,6 +252,21 @@ function AdminProductsPage() {
                       className="text-primary hover:underline"
                     >
                       Изменить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft({
+                          ...toDraft(product),
+                          id: null,
+                          title: `${product.title} (копия)`,
+                          slug: slugify(`${product.title} kopiya`),
+                        });
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="ml-4 text-muted-foreground hover:text-primary"
+                    >
+                      Дублировать
                     </button>
                     <button
                       type="button"
@@ -347,15 +406,14 @@ function ProductForm({
             className={field}
           />
         </label>
-        <label className="text-sm sm:col-span-2">
-          <span className="mb-1.5 block text-muted-foreground">Ссылка на фото</span>
-          <input
+        <div className="text-sm sm:col-span-2">
+          <span className="mb-1.5 block text-muted-foreground">Фото товара</span>
+          <PhotoUploader
+            slug={draft.slug}
             value={draft.image_url}
-            onChange={(e) => onChange({ ...draft, image_url: e.target.value })}
-            placeholder="https://…"
-            className={field}
+            onChange={(url) => onChange({ ...draft, image_url: url })}
           />
-        </label>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-6 text-sm">
@@ -390,5 +448,94 @@ function ProductForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function PhotoUploader({
+  slug,
+  value,
+  onChange,
+}: {
+  slug: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  const preview = value || productImage({ slug, image_url: null });
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Нужен файл JPG, PNG или WebP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Фото больше 5 МБ");
+      return;
+    }
+    setBusy(true);
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = `${slug || "tovar"}-${Date.now().toString(36)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(path, file, { contentType: file.type, upsert: false });
+    setBusy(false);
+    if (error) {
+      toast.error("Не удалось загрузить фото", { description: error.message });
+      return;
+    }
+    onChange(`/api/public/product-image/${path}`);
+    toast.success("Фото загружено — не забудьте сохранить товар");
+  }
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        upload(e.dataTransfer.files[0]);
+      }}
+      className={`flex flex-wrap items-center gap-5 rounded-2xl border-2 border-dashed p-4 ${
+        over ? "border-primary bg-accent" : "border-border"
+      }`}
+    >
+      <img src={preview} alt="Фото товара" className="h-28 w-28 rounded-xl object-cover" />
+      <div className="flex flex-col gap-2">
+        <p className="text-muted-foreground">
+          {value ? "Своё фото загружено" : "Сейчас стандартное фото"}. Перетащите файл сюда или выберите.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex h-10 cursor-pointer items-center rounded-full bg-primary px-5 text-primary-foreground">
+            {busy ? "Загружаем…" : value ? "Заменить фото" : "Выбрать фото"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                upload(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="h-10 rounded-full border border-border px-5"
+            >
+              Убрать фото
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">JPG, PNG или WebP, до 5 МБ</p>
+      </div>
+    </div>
   );
 }

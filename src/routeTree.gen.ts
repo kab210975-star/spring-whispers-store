@@ -17,6 +17,7 @@ import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as OfferRouteImport } from './routes/offer'
 import { Route as OrderAcceptedRouteImport } from './routes/order-accepted'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as CatalogIndexRouteImport } from './routes/catalog.index'
 import { Route as CatalogSlugRouteImport } from './routes/catalog.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -63,6 +64,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CatalogIndexRoute = CatalogIndexRouteImport.update({
   id: '/catalog/',
   path: '/catalog/',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog': typeof CatalogIndexRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/offer': typeof OfferRoute
   '/order-accepted': typeof OrderAcceptedRoute
   '/privacy': typeof PrivacyRoute
+  '/api/chat': typeof ApiChatRoute
   '/catalog/$slug': typeof CatalogSlugRoute
   '/catalog/': typeof CatalogIndexRoute
   '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog/'
     | '/admin/products'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog'
     | '/admin/products'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/offer'
     | '/order-accepted'
     | '/privacy'
+    | '/api/chat'
     | '/catalog/$slug'
     | '/catalog/'
     | '/_authenticated/admin/products'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   OfferRoute: typeof OfferRoute
   OrderAcceptedRoute: typeof OrderAcceptedRoute
   PrivacyRoute: typeof PrivacyRoute
+  ApiChatRoute: typeof ApiChatRoute
   CatalogSlugRoute: typeof CatalogSlugRoute
   CatalogIndexRoute: typeof CatalogIndexRoute
   ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/catalog/': {
@@ -333,6 +353,7 @@ const rootRouteChildren: RootRouteChildren = {
   OfferRoute: OfferRoute,
   OrderAcceptedRoute: OrderAcceptedRoute,
   PrivacyRoute: PrivacyRoute,
+  ApiChatRoute: ApiChatRoute,
   CatalogSlugRoute: CatalogSlugRoute,
   CatalogIndexRoute: CatalogIndexRoute,
   ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,

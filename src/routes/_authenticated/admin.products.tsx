@@ -5,7 +5,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
+import { supabase } from "@/integrations/supabase/client";
 import { deleteProduct, getMyAccess, listAllProducts, saveProduct } from "@/lib/admin.functions";
+import { productImage } from "@/lib/product-images";
 import { formatPrice, kindLabels } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 import type { Product, ProductKind } from "@/lib/types";
@@ -80,6 +82,9 @@ function AdminProductsPage() {
   const remove = useServerFn(deleteProduct);
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<ProductKind | "all">("all");
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "out">("all");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
   const canManage = access.data?.role === "admin" || access.data?.role === "staff";
@@ -129,14 +134,25 @@ function AdminProductsPage() {
     );
   }
 
-  const list = (products.data ?? []) as Product[];
+  const all = (products.data ?? []) as Product[];
+  const q = search.trim().toLowerCase();
+  const list = all.filter(
+    (p) =>
+      (kindFilter === "all" || p.kind === kindFilter) &&
+      (stockFilter === "all" || (stockFilter === "in" ? p.in_stock : !p.in_stock)) &&
+      (!q || p.title.toLowerCase().includes(q)),
+  );
+  const chip = (active: boolean) =>
+    `h-9 rounded-full px-4 text-sm ${active ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"}`;
 
   return (
     <AdminShell role={access.data?.role ?? null}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl">Товары</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Всего позиций: {list.length}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Всего позиций: {all.length}, показано: {list.length}
+          </p>
         </div>
         <button
           type="button"
@@ -145,6 +161,25 @@ function AdminProductsPage() {
         >
           Добавить товар
         </button>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по названию"
+          className="h-9 w-56 rounded-full border border-border bg-background px-4 text-sm"
+        />
+        {(["all", "bouquet", "single", "gift"] as const).map((k) => (
+          <button key={k} type="button" onClick={() => setKindFilter(k)} className={chip(kindFilter === k)}>
+            {k === "all" ? "Все типы" : kindLabels[k]}
+          </button>
+        ))}
+        {(["all", "in", "out"] as const).map((s) => (
+          <button key={s} type="button" onClick={() => setStockFilter(s)} className={chip(stockFilter === s)}>
+            {s === "all" ? "Любое наличие" : s === "in" ? "В наличии" : "Нет в наличии"}
+          </button>
+        ))}
       </div>
 
       {draft && (
@@ -176,8 +211,17 @@ function AdminProductsPage() {
               {list.map((product) => (
                 <tr key={product.id} className="border-b border-border/60 last:border-0">
                   <td className="px-5 py-4">
-                    <p className="font-medium">{product.title}</p>
-                    <p className="text-xs text-muted-foreground">{product.slug}</p>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={productImage(product)}
+                        alt=""
+                        className="h-12 w-12 rounded-lg object-cover"
+                      />
+                      <div>
+                        <p className="font-medium">{product.title}</p>
+                        <p className="text-xs text-muted-foreground">{product.slug}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-4 text-muted-foreground">{kindLabels[product.kind]}</td>
                   <td className="px-5 py-4">{formatPrice(product.price)}</td>

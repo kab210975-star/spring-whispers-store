@@ -163,6 +163,39 @@ function ChatDetail({ id }: { id: string }) {
     onSuccess: refresh,
     onError: () => toast.error("Не удалось изменить статус"),
   });
+  const order = useMutation({
+    mutationFn: () =>
+      createOrder({
+        data: {
+          id,
+          items: Object.entries(orderItems)
+            .filter(([, qty]) => qty > 0)
+            .map(([product_id, quantity]) => ({ product_id, quantity })),
+          delivery_date: orderDate || null,
+          delivery_slot: orderSlot || null,
+          address: orderAddress.trim() || null,
+          card_text: orderCard.trim() || null,
+          comment: orderComment.trim() || null,
+        },
+      }),
+    onSuccess: (r) => {
+      toast.success(`Заявка № ${r.order_number} оформлена`);
+      setOrderOpen(false);
+      setOrderItems({});
+      setOrderDate("");
+      setOrderSlot("");
+      setOrderAddress("");
+      setOrderCard("");
+      setOrderComment("");
+      refresh();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Не удалось оформить заявку"),
+  });
+  const orderTotal = Object.entries(orderItems).reduce((sum, [pid, qty]) => {
+    const p = (catalog.data ?? []).find((x) => x.id === pid);
+    return sum + (p ? Number(p.price) * qty : 0);
+  }, 0);
+  const orderCount = Object.values(orderItems).filter((v) => v > 0).length;
 
   if (!chat.data) return <div className="rounded-3xl bg-card p-8 text-sm text-muted-foreground">Загружаем…</div>;
   const { session, messages } = chat.data;

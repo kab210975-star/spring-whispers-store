@@ -6,7 +6,11 @@ import { toast } from "sonner";
 
 import { AdminShell, NoAccess } from "@/components/site/AdminShell";
 import { getMyAccess } from "@/lib/admin.functions";
-import { getChat, listChats, replyToChat, setChatStatus } from "@/lib/chat-admin.functions";
+import { getChat, listChatCatalog, listChats, replyToChat, setChatStatus, uploadOperatorImage } from "@/lib/chat-admin.functions";
+import { asAttachments, chatImageUrl, type ImageAttachment } from "@/lib/chat-attachments";
+import { ChatAttachments } from "@/components/site/ChatAttachments";
+import { fileToBase64 } from "@/lib/file-base64";
+import { productImage } from "@/lib/product-images";
 
 export const Route = createFileRoute("/_authenticated/admin/chats")({
   head: () => ({
@@ -111,6 +115,29 @@ function ChatDetail({ id }: { id: string }) {
   const changeStatus = useServerFn(setChatStatus);
   const qc = useQueryClient();
   const [text, setText] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fetchCatalog = useServerFn(listChatCatalog);
+  const uploadImg = useServerFn(uploadOperatorImage);
+  const catalog = useQuery({ queryKey: ["admin", "chat-catalog"], queryFn: () => fetchCatalog(), enabled: pickerOpen });
+  async function onFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(files).slice(0, 4)) {
+        if (f.size > 5 * 1024 * 1024) throw new Error("Фото до 5 МБ");
+        const att = await uploadImg({ data: { id, mime: f.type, base64: await fileToBase64(f) } });
+        setImages((p) => [...p, att]);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось загрузить фото");
+    } finally {
+      setUploading(false);
+    }
+  }
   const chat = useQuery({ queryKey: ["admin", "chat", id], queryFn: () => fetchChat({ data: { id } }), refetchInterval: 5000 });
 
   const refresh = () => {
@@ -118,8 +145,8 @@ function ChatDetail({ id }: { id: string }) {
     qc.invalidateQueries({ queryKey: ["admin", "chats"] });
   };
   const send = useMutation({
-    mutationFn: () => reply({ data: { id, text } }),
-    onSuccess: () => { setText(""); refresh(); },
+    mutationFn: () => reply({ data: { id, text, product_ids: picked, images } }),
+    onSuccess: () => { setText(""); setPicked([]); setImages([]); setPickerOpen(false); refresh(); },
     onError: () => toast.error("Не удалось отправить"),
   });
   const status = useMutation({
@@ -159,13 +186,55 @@ function ChatDetail({ id }: { id: string }) {
               <p className="mb-1 text-[11px] opacity-70">
                 {m.role === "user" ? "Покупатель" : m.role === "operator" ? "Оператор" : "ИИ"} · {fmt(m.created_at)}
               </p>
-              <p className="whitespace-pre-wrap">{m.content}</p>
+              {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
+              <div className="mt-1"><ChatAttachments items={asAttachments(m.attachments)} linkable={false} /></div>
             </div>
           </div>
         ))}
       </div>
+      {pickerOpen && (
+        <div className="mb-3 rounded-2xl border border-border p-3">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск товара…" className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm" />
+          <div className="grid max-h-60 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+            {(catalog.data ?? [])
+              .filter((p) => p.title.toLowerCase().includes(q.toLowerCase()))
+              .map((p) => {
+                const on = picked.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPicked((x) => (on ? x.filter((i) => i !== p.id) : [...x, p.id]))}
+                    className={`flex items-center gap-2 rounded-xl border p-2 text-left text-xs ${on ? "border-primary bg-secondary" : "border-border"}`}
+                  >
+                    <img src={productImage(p)} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                    <span className="min-w-0"><span className="block truncate">{p.title}</span>{Number(p.price)} ₽{p.in_stock ? "" : " · нет"}</span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
+      {(picked.length > 0 || images.length > 0) && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          К отправке: {picked.length ? `товаров — ${picked.length}` : ""} {images.length ? `фото — ${images.length}` : ""}
+          <button type="button" className="ml-2 text-primary" onClick={() => { setPicked([]); setImages([]); }}>очистить</button>
+        </p>
+      )}
+      {images.length > 0 && (
+        <div className="mb-2 flex gap-2">{images.map((a) => <img key={a.path} src={chatImageUrl(a.path)} alt="" className="h-12 w-12 rounded-lg object-cover" />)}</div>
+      )}
+      <div className="mb-2 flex gap-2 text-xs">
+        <button type="button" onClick={() => setPickerOpen((v) => !v)} className="rounded-full border border-border px-3 py-1.5">
+          {pickerOpen ? "Скрыть каталог" : "Показать букет"}
+        </button>
+        <label className="cursor-pointer rounded-full border border-border px-3 py-1.5">
+          {uploading ? "Загружаю…" : "Прикрепить фото"}
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
+        </label>
+      </div>
       <form
-        onSubmit={(e) => { e.preventDefault(); if (text.trim()) send.mutate(); }}
+        onSubmit={(e) => { e.preventDefault(); if (text.trim() || picked.length || images.length) send.mutate(); }}
         className="flex gap-2 border-t border-border pt-4"
       >
         <textarea
@@ -175,7 +244,7 @@ function ChatDetail({ id }: { id: string }) {
           rows={2}
           className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
         />
-        <button type="submit" disabled={send.isPending || !text.trim()} className="rounded-full bg-primary px-5 text-sm text-primary-foreground disabled:opacity-50">
+        <button type="submit" disabled={send.isPending || uploading || (!text.trim() && !picked.length && !images.length)} className="rounded-full bg-primary px-5 text-sm text-primary-foreground disabled:opacity-50">
           Ответить
         </button>
       </form>

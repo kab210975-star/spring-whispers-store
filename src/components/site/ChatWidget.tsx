@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { Headset, X } from "lucide-react";
+import { Headset, Loader2, Paperclip, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import tulipBot from "@/assets/tulip-bot.png";
@@ -26,18 +26,34 @@ import {
   getChatUpdates,
   sendVisitorMessage,
   startChat,
+  uploadVisitorImage,
 } from "@/lib/chat.functions";
+import { asAttachments, chatImageUrl, type Attachment, type ImageAttachment } from "@/lib/chat-attachments";
+import { ChatAttachments } from "@/components/site/ChatAttachments";
+import { fileToBase64 } from "@/lib/file-base64";
 
 const TOKEN_KEY = "tulip-garden-chat-token";
 
 type Status = "ai" | "operator" | "closed";
-type Row = { id: string; role: string; content: string; created_at: string };
+type Row = { id: string; role: string; content: string; created_at: string; attachments?: unknown };
+type Meta = { operator?: boolean; attachments?: Attachment[] } | undefined;
+
+function partsAttachments(m: UIMessage): Attachment[] {
+  const out: Attachment[] = [...((m.metadata as Meta)?.attachments ?? [])];
+  for (const p of m.parts) {
+    if (!p.type.startsWith("tool-") || !("state" in p) || p.state !== "output-available") continue;
+    const o = (p as { output?: { card?: Attachment; cards?: Attachment[] } }).output;
+    if (o?.card) out.push(o.card);
+    if (o?.cards) out.push(...o.cards);
+  }
+  return out;
+}
 
 function rowToMessage(r: Row): UIMessage {
   return {
     id: r.id,
     role: r.role === "user" ? "user" : "assistant",
-    metadata: r.role === "operator" ? { operator: true } : undefined,
+    metadata: { operator: r.role === "operator", attachments: asAttachments(r.attachments) },
     parts: [{ type: "text", text: r.content }],
   };
 }
@@ -217,12 +233,39 @@ function ChatWindow({
   const updates = useServerFn(getChatUpdates);
   const sendManual = useServerFn(sendVisitorMessage);
   const operatorFn = useServerFn(callOperator);
+  const upload = useServerFn(uploadVisitorImage);
+  const [pending, setPending] = useState<ImageAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function pickFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setError(null);
+    setUploading(true);
+    try {
+      for (const f of Array.from(files).slice(0, 4 - pending.length)) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) throw new Error("Можно JPG, PNG или WebP");
+        if (f.size > 5 * 1024 * 1024) throw new Error("Фото должно быть до 5 МБ");
+        const att = await upload({ data: { token, mime: f.type, base64: await fileToBase64(f) } });
+        setPending((p) => [...p, att]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось загрузить фото");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => ({ body: { token, message: messages.at(-1) } }),
+        prepareSendMessagesRequest: ({ messages }) => {
+          const last = messages.at(-1);
+          const images = ((last?.metadata as Meta)?.attachments ?? []).filter((a) => a.type === "image");
+          return { body: { token, message: last, images } };
+        },
       }),
     [token],
   );
@@ -258,18 +301,21 @@ function ChatWindow({
 
   async function handleSubmit({ text }: { text: string }) {
     const value = text.trim();
-    if (!value || busy) return;
+    const images = pending;
+    if ((!value && !images.length) || busy || uploading) return;
     setError(null);
+    setPending([]);
+    const metadata = { attachments: images };
     if (status === "ai") {
-      await sendMessage({ text: value });
+      await sendMessage({ text: value || "Вот фото букета", metadata });
       return;
     }
     setMessages((prev) => [
       ...prev,
-      { id: `local-${Date.now()}`, role: "user", parts: [{ type: "text", text: value }] },
+      { id: `local-${Date.now()}`, role: "user", metadata, parts: [{ type: "text", text: value }] },
     ]);
     try {
-      await sendManual({ data: { token, text: value } });
+      await sendManual({ data: { token, text: value, images } });
     } catch {
       setError("Сообщение не отправлено");
     }
@@ -292,7 +338,8 @@ function ChatWindow({
             />
           ) : (
             messages.map((m) => {
-              const isOperator = (m.metadata as { operator?: boolean } | undefined)?.operator;
+              const isOperator = (m.metadata as Meta)?.operator;
+              const atts = partsAttachments(m);
               const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
               const toolWorking = m.parts.some(
                 (p) => p.type.startsWith("tool-") && "state" in p && p.state !== "output-available",
@@ -302,7 +349,8 @@ function ChatWindow({
                   {isOperator && <span className="text-xs text-primary">Оператор</span>}
                   <MessageContent className="group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground group-[.is-user]:rounded-2xl">
                     {text && <MessageResponse>{text}</MessageResponse>}
-                    {!text && toolWorking && <Shimmer>Сверяюсь с каталогом…</Shimmer>}
+                    <ChatAttachments items={atts} />
+                    {toolWorking && <Shimmer>Сверяюсь с каталогом…</Shimmer>}
                   </MessageContent>
                 </Message>
               );
@@ -322,9 +370,44 @@ function ChatWindow({
           <p className="mb-2 text-xs text-muted-foreground">Обращение закрыто. Можете написать снова.</p>
         )}
         {error && <p className="mb-2 text-xs text-destructive">{error}</p>}
+        {pending.length > 0 && (
+          <div className="mb-2 flex gap-2">
+            {pending.map((a) => (
+              <div key={a.path} className="relative">
+                <img src={chatImageUrl(a.path)} alt="" className="h-14 w-14 rounded-xl object-cover" />
+                <button
+                  type="button"
+                  aria-label="Убрать фото"
+                  onClick={() => setPending((p) => p.filter((x) => x.path !== a.path))}
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          hidden
+          onChange={(e) => pickFiles(e.target.files)}
+        />
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea placeholder="Напишите сообщение…" autoFocus />
           <PromptInputFooter className="justify-between">
+            <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Прикрепить фото"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading || pending.length >= 4}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />} Фото
+            </button>
             {status === "ai" ? (
               <button
                 type="button"
@@ -333,9 +416,8 @@ function ChatWindow({
               >
                 <Headset className="h-3.5 w-3.5" /> Позвать оператора
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
+            </div>
             <PromptInputSubmit status={chatStatus} disabled={busy} />
           </PromptInputFooter>
         </PromptInput>

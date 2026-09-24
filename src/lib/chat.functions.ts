@@ -19,6 +19,23 @@ async function sessionByToken(token: string) {
 }
 
 const tokenSchema = z.object({ token: z.string().min(20).max(100) });
+export const imageSchema = z.object({
+  type: z.literal("image"),
+  path: z.string().max(200),
+  mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+});
+
+export const uploadVisitorImage = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    tokenSchema
+      .extend({ mime: z.string().max(40), base64: z.string().min(10).max(7_500_000) })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { session } = await sessionByToken(data.token);
+    const { uploadChatImage } = await import("./chat-upload.server");
+    return uploadChatImage(session.id, data.mime, data.base64);
+  });
 
 export const startChat = createServerFn({ method: "POST" })
   .inputValidator((input) =>
@@ -53,7 +70,7 @@ export const getChatHistory = createServerFn({ method: "POST" })
     const { db, session } = await sessionByToken(data.token);
     const { data: messages } = await db
       .from("chat_messages")
-      .select("id, role, content, created_at")
+      .select("id, role, content, created_at, attachments")
       .eq("session_id", session.id)
       .order("created_at", { ascending: true });
     return { status: session.status, name: session.customer_name, messages: messages ?? [] };
@@ -65,7 +82,7 @@ export const getChatUpdates = createServerFn({ method: "POST" })
     const { db, session } = await sessionByToken(data.token);
     const { data: messages } = await db
       .from("chat_messages")
-      .select("id, role, content, created_at")
+      .select("id, role, content, created_at, attachments")
       .eq("session_id", session.id)
       .eq("role", "operator")
       .gt("created_at", data.after)
@@ -75,12 +92,18 @@ export const getChatUpdates = createServerFn({ method: "POST" })
 
 /** Сообщение покупателя, когда чат ведёт оператор (без ИИ). */
 export const sendVisitorMessage = createServerFn({ method: "POST" })
-  .inputValidator((input) => tokenSchema.extend({ text: z.string().trim().min(1).max(4000) }).parse(input))
+  .inputValidator((input) =>
+    tokenSchema
+      .extend({ text: z.string().trim().max(4000), images: z.array(imageSchema).max(4).default([]) })
+      .parse(input),
+  )
   .handler(async ({ data }) => {
     const { db, session } = await sessionByToken(data.token);
+    const images = data.images.filter((i) => i.path.startsWith(`${session.id}/`));
+    if (!data.text && images.length === 0) throw new Error("Пустое сообщение");
     const { error } = await db
       .from("chat_messages")
-      .insert({ session_id: session.id, role: "user", content: data.text });
+      .insert({ session_id: session.id, role: "user", content: data.text, attachments: images });
     if (error) throw new Error("Сообщение не отправлено");
     await db
       .from("chat_sessions")

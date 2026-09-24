@@ -31,6 +31,8 @@ function AdminOrdersPage() {
   const removeOrder = useServerFn(deleteOrder);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
+  const [search, setSearch] = useState("");
+  const [date, setDate] = useState("");
 
   const access = useQuery({ queryKey: ["admin", "access"], queryFn: () => fetchAccess() });
   const canManage = access.data?.role === "admin" || access.data?.role === "staff";
@@ -76,36 +78,93 @@ function AdminOrdersPage() {
     );
   }
 
-  const list = ((orders.data ?? []) as Order[]).filter(
-    (order) => filter === "all" || order.status === filter,
+  const allOrders = (orders.data ?? []) as Order[];
+  const q = search.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, "");
+  const list = allOrders.filter(
+    (order) =>
+      (filter === "all" || order.status === filter) &&
+      (!date || order.delivery_date === date) &&
+      (!q ||
+        order.customer_name.toLowerCase().includes(q) ||
+        (qDigits.length > 0 && order.phone.replace(/\D/g, "").includes(qDigits))),
   );
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const today = new Date().toDateString();
+  const statusTone: Record<OrderStatus, string> = {
+    new: "bg-primary text-primary-foreground",
+    in_progress: "bg-accent text-accent-foreground",
+    delivered: "bg-secondary text-secondary-foreground",
+    cancelled: "bg-muted text-muted-foreground",
+  };
 
   return (
     <AdminShell role={access.data?.role ?? null}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl">Заявки</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Всего: {(orders.data ?? []).length}. Новых:{" "}
-            {((orders.data ?? []) as Order[]).filter((o) => o.status === "new").length}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(["all", ...statusOrder] as const).map((value) => (
+      <h1 className="font-display text-3xl">Заявки</h1>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {statusOrder.map((status) => {
+          const items = allOrders.filter((o) => o.status === status);
+          return (
             <button
-              key={value}
+              key={status}
               type="button"
-              onClick={() => setFilter(value)}
-              className={`h-9 rounded-full px-4 text-sm ${
-                filter === value
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted-foreground"
-              }`}
+              onClick={() => setFilter(status)}
+              className="rounded-3xl bg-card p-5 text-left hover:ring-2 hover:ring-primary/40"
             >
-              {value === "all" ? "Все" : statusLabels[value]}
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs ${statusTone[status]}`}>
+                {statusLabels[status]}
+              </span>
+              <p className="mt-3 font-display text-3xl">{items.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                сегодня: {items.filter((o) => new Date(o.created_at).toDateString() === today).length} · за неделю:{" "}
+                {items.filter((o) => new Date(o.created_at).getTime() >= weekAgo).length}
+              </p>
             </button>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Имя или телефон"
+          className="h-9 w-52 rounded-full border border-border bg-background px-4 text-sm"
+        />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          Дата доставки
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground"
+          />
+        </label>
+        {(["all", ...statusOrder] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFilter(value)}
+            className={`h-9 rounded-full px-4 text-sm ${
+              filter === value ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"
+            }`}
+          >
+            {value === "all" ? "Все" : statusLabels[value]}
+          </button>
+        ))}
+        {(search || date || filter !== "all") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setDate("");
+              setFilter("all");
+            }}
+            className="h-9 px-3 text-sm text-primary hover:underline"
+          >
+            Сбросить
+          </button>
+        )}
       </div>
 
       {orders.isLoading ? (

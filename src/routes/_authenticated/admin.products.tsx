@@ -391,3 +391,92 @@ function ProductForm({
     </form>
   );
 }
+
+function PhotoUploader({
+  slug,
+  value,
+  onChange,
+}: {
+  slug: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  const preview = value || productImage({ slug, image_url: null });
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Нужен файл JPG, PNG или WebP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Фото больше 5 МБ");
+      return;
+    }
+    setBusy(true);
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = `${slug || "tovar"}-${Date.now().toString(36)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(path, file, { contentType: file.type, upsert: false });
+    setBusy(false);
+    if (error) {
+      toast.error("Не удалось загрузить фото", { description: error.message });
+      return;
+    }
+    onChange(`/api/public/product-image/${path}`);
+    toast.success("Фото загружено — не забудьте сохранить товар");
+  }
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        upload(e.dataTransfer.files[0]);
+      }}
+      className={`flex flex-wrap items-center gap-5 rounded-2xl border-2 border-dashed p-4 ${
+        over ? "border-primary bg-accent" : "border-border"
+      }`}
+    >
+      <img src={preview} alt="Фото товара" className="h-28 w-28 rounded-xl object-cover" />
+      <div className="flex flex-col gap-2">
+        <p className="text-muted-foreground">
+          {value ? "Своё фото загружено" : "Сейчас стандартное фото"}. Перетащите файл сюда или выберите.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex h-10 cursor-pointer items-center rounded-full bg-primary px-5 text-primary-foreground">
+            {busy ? "Загружаем…" : value ? "Заменить фото" : "Выбрать фото"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                upload(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="h-10 rounded-full border border-border px-5"
+            >
+              Убрать фото
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">JPG, PNG или WebP, до 5 МБ</p>
+      </div>
+    </div>
+  );
+}

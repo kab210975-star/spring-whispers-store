@@ -91,7 +91,9 @@ function Footer() {
         <div>
           <p className="font-display text-2xl">{site.name}</p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Небольшая мастерская тюльпанов. Срезаем утром, привозим в тот же день.
+            Небольшая мастерская тюльпанов.&nbsp;
+            <br />
+            Срезаем утром, привозим в тот же день.
           </p>
         </div>
         <div className="text-sm">

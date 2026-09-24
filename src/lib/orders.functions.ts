@@ -78,5 +78,7 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error("Не удалось сохранить состав заявки. Пожалуйста, свяжитесь с нами по телефону.");
     }
 
+    const { notifyNewOrder } = await import("./telegram.server");
+    await notifyNewOrder(orderId, "корзина");
     return { id: orderId, total };
   });

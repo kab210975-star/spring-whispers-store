@@ -213,6 +213,15 @@ function ChatDetail({ id }: { id: string }) {
           {session.order_id && <p className="mt-1 text-xs">Заявка № {session.order_id.slice(0, 8)} — см. «Заявки»</p>}
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
+          {!session.order_id && (
+            <button
+              type="button"
+              onClick={() => setOrderOpen((v) => !v)}
+              className="rounded-full bg-primary px-3 py-1.5 text-primary-foreground"
+            >
+              {orderOpen ? "Скрыть форму заявки" : "Оформить заявку"}
+            </button>
+          )}
           {session.status !== "ai" && (
             <button type="button" onClick={() => status.mutate("ai")} className="rounded-full border border-border px-3 py-1.5">Вернуть ИИ</button>
           )}
@@ -221,6 +230,51 @@ function ChatDetail({ id }: { id: string }) {
           )}
         </div>
       </div>
+      {orderOpen && !session.order_id && (
+        <div className="mb-3 space-y-3 rounded-2xl border border-border p-4">
+          <p className="text-sm font-medium">Новая заявка из чата</p>
+          <div className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+            {(catalog.data ?? []).map((p) => {
+              const qty = orderItems[p.id] ?? 0;
+              return (
+                <div key={p.id} className={`flex items-center gap-2 rounded-xl border p-2 text-xs ${qty > 0 ? "border-primary bg-secondary" : "border-border"}`}>
+                  <img src={productImage(p)} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{p.title}</span>
+                    {formatPrice(p.price)}{p.in_stock ? "" : " · нет в наличии"}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <button type="button" className="h-6 w-6 rounded-full border border-border" onClick={() => setOrderItems((m) => ({ ...m, [p.id]: Math.max(0, qty - 1) }))}>−</button>
+                    <span className="w-5 text-center">{qty}</span>
+                    <button type="button" className="h-6 w-6 rounded-full border border-border" onClick={() => setOrderItems((m) => ({ ...m, [p.id]: Math.min(200, qty + 1) }))}>+</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} className="rounded-xl border border-input bg-background px-3 py-2 text-sm" />
+            <select value={orderSlot} onChange={(e) => setOrderSlot(e.target.value)} className="rounded-xl border border-input bg-background px-3 py-2 text-sm">
+              <option value="">Интервал доставки…</option>
+              {deliverySlots.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <input value={orderAddress} onChange={(e) => setOrderAddress(e.target.value)} placeholder="Адрес доставки" className="rounded-xl border border-input bg-background px-3 py-2 text-sm sm:col-span-2" />
+            <input value={orderCard} onChange={(e) => setOrderCard(e.target.value)} placeholder="Текст открытки (по желанию)" className="rounded-xl border border-input bg-background px-3 py-2 text-sm sm:col-span-2" />
+            <input value={orderComment} onChange={(e) => setOrderComment(e.target.value)} placeholder="Комментарий к заявке" className="rounded-xl border border-input bg-background px-3 py-2 text-sm sm:col-span-2" />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm">Итого: <b>{formatPrice(orderTotal)}</b> <span className="text-xs text-muted-foreground">(доставка считается при подтверждении)</span></p>
+            <button
+              type="button"
+              disabled={order.isPending || orderCount === 0}
+              onClick={() => order.mutate()}
+              className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-50"
+            >
+              {order.isPending ? "Оформляем…" : "Создать заявку"}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-h-[50vh] flex-1 space-y-3 overflow-y-auto py-4">
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>

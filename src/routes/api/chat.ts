@@ -254,6 +254,8 @@ ${catalogText}`;
                 );
                 if (itemsErr) return { ok: false, error: "Не удалось сохранить состав заявки" };
                 await db.from("chat_sessions").update({ order_id: orderId }).eq("id", session.id);
+                const { notifyNewOrder } = await import("@/lib/telegram.server");
+                await notifyNewOrder(orderId, "чат с ИИ");
                 return { ok: true, order_number: orderId.slice(0, 8), subtotal, missing };
               },
             }),

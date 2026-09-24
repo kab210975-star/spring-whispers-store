@@ -206,5 +206,7 @@ export const createOrderFromChat = createServerFn({ method: "POST" })
       role: "operator",
       content: `Заявка оформлена: ${summary}. Итого ${subtotal} ₽ (без учёта доставки). Мы позвоним, чтобы подтвердить время.`,
     });
+    const { notifyNewOrder } = await import("./telegram.server");
+    await notifyNewOrder(orderId, "оператор в чате");
     return { ok: true, order_number: orderId.slice(0, 8), subtotal };
   });

@@ -53,7 +53,7 @@ function HomePage() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-14 lg:grid-cols-[1.05fr_1fr] lg:pt-20">
           <div>
             <p className="font-hand text-2xl text-primary">весна приехала в Москву</p>
-            <p className="mt-4 font-display text-[2.7rem] leading-[1.05] sm:text-6xl">
+            <p className="mt-4 font-display text-[3.4rem] leading-[1.03] sm:text-7xl lg:text-8xl">
               Тюльпаны,
               <br />
               срезанные утром

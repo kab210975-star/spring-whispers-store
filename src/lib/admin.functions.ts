@@ -38,12 +38,15 @@ export const listOrders = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("orders")
       .select(
-        "id, created_at, customer_name, phone, delivery_date, delivery_slot, address, comment, card_text, total, status, admin_note, order_items(id, title, price, quantity)",
+        "id, created_at, customer_name, phone, customer_name_enc, phone_enc, address_enc, card_text_enc, delivery_date, delivery_slot, address, comment, card_text, total, status, admin_note, order_items(id, title, price, quantity)",
       )
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
-    return (data ?? []).map((order) => ({
+    const { decryptRow, logPIIAccess } = await import("./pii.server");
+    await logPIIAccess(context.supabase, context.userId, "orders_list", null);
+    const rows = await Promise.all((data ?? []).map((o) => decryptRow(o)));
+    return rows.map((order) => ({
       ...order,
       total: Number(order.total),
       order_items: (order.order_items ?? []).map((item) => ({ ...item, price: Number(item.price) })),

@@ -10,12 +10,13 @@ async function sessionByToken(token: string) {
   const db = await admin();
   const { data, error } = await db
     .from("chat_sessions")
-    .select("id, status, needs_operator, customer_name, order_id")
+    .select("id, status, needs_operator, customer_name, phone, customer_name_enc, phone_enc, address_enc, order_id")
     .eq("token", token)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Чат не найден");
-  return { db, session: data };
+  const { decryptRow } = await import("./pii.server");
+  return { db, session: await decryptRow({ ...data, address: null as string | null }) };
 }
 
 const tokenSchema = z.object({ token: z.string().min(20).max(100) });
@@ -53,10 +54,10 @@ export const startChat = createServerFn({ method: "POST" })
     const db = await admin();
     const token = `${randomUUID()}${randomUUID()}`.replace(/-/g, "");
     const now = new Date().toISOString();
+    const { encryptedPersonFields } = await import("./pii.server");
     const { error } = await db.from("chat_sessions").insert({
       token,
-      customer_name: data.name,
-      phone: data.phone,
+      ...(await encryptedPersonFields({ customer_name: data.name, phone: data.phone })),
       privacy_accepted_at: now,
       pd_consent_at: now,
     });
@@ -73,7 +74,12 @@ export const getChatHistory = createServerFn({ method: "POST" })
       .select("id, role, content, created_at, attachments")
       .eq("session_id", session.id)
       .order("created_at", { ascending: true });
-    return { status: session.status, name: session.customer_name, messages: messages ?? [] };
+    return {
+      status: session.status,
+      name: session.customer_name,
+      pii: { name: session.customer_name, phone: session.phone, address: session.address },
+      messages: messages ?? [],
+    };
   });
 
 export const getChatUpdates = createServerFn({ method: "POST" })

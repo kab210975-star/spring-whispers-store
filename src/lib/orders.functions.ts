@@ -25,6 +25,7 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { createPublicClient } = await import("./supabase-public.server");
     const supabase = createPublicClient();
+    const { encryptedOrderFields } = await import("./pii.server");
 
     const slugs = data.items.map((i) => i.slug);
     const { data: products, error: productsError } = await supabase
@@ -56,13 +57,15 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const { error: orderError } = await supabase.from("orders").insert({
       id: orderId,
-      customer_name: data.customer_name,
-      phone: data.phone,
+      ...(await encryptedOrderFields({
+        customer_name: data.customer_name,
+        phone: data.phone,
+        address: data.address || null,
+        card_text: data.card_text || null,
+      })),
       delivery_date: data.delivery_date || null,
       delivery_slot: data.delivery_slot || null,
-      address: data.address || null,
       comment: data.comment || null,
-      card_text: data.card_text || null,
       total,
     });
 

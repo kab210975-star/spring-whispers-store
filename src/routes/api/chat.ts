@@ -35,12 +35,21 @@ export const Route = createFileRoute("/api/chat")({
         if (!key) return new Response("ИИ не настроен", { status: 500 });
 
         const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-        const { data: session } = await db
+        const { data: rawSession } = await db
           .from("chat_sessions")
-          .select("id, status, customer_name, phone, order_id")
+          .select("id, status, customer_name, phone, customer_name_enc, phone_enc, address_enc, order_id")
           .eq("token", token)
           .maybeSingle();
-        if (!session) return new Response("Чат не найден", { status: 404 });
+        if (!rawSession) return new Response("Чат не найден", { status: 404 });
+        const pii = await import("@/lib/pii.server");
+        const session = await pii.decryptRow({ ...rawSession, address: null as string | null });
+        const redact = (t: string) => pii.redactPII(t, session.customer_name);
+        // Адрес, который покупатель написал в чате, запоминаем зашифрованным — ИИ его не увидит.
+        const detected = redact(userText).address;
+        if (detected) {
+          session.address = detected;
+          await db.from("chat_sessions").update({ address_enc: await pii.encryptPII(detected) }).eq("id", session.id);
+        }
         const images = imgParse.data.filter((i) => i.path.startsWith(`${session.id}/`));
         if (session.status !== "ai") {
           return new Response("Чат ведёт оператор", { status: 409 });
@@ -74,14 +83,15 @@ export const Route = createFileRoute("/api/chat")({
           )
           .join("\n");
 
-        const system = `Ты — флорист-консультант магазина «${site.name}» (тюльпаны, ${site.deliveryZone}). Общайся по-русски, тепло, коротко, на «вы». Покупателя зовут ${session.customer_name}.
+        const system = `Ты — флорист-консультант магазина «${site.name}» (тюльпаны, ${site.deliveryZone}). Общайся по-русски, тепло, коротко, на «вы». 
+ЗАЩИТА ДАННЫХ: ты НЕ знаешь имени, телефона, email и адреса покупателя — в сообщениях они заменены метками [имя], [телефон], [email], [адрес]. Не спрашивай их повторно и не пытайся угадать. Когда нужно обратиться по имени или показать данные в итоге заявки, пиши метки {{имя}}, {{телефон}}, {{адрес}} — сайт сам подставит настоящие значения.
 Работай ТОЛЬКО с товарами из каталога ниже, не выдумывай товары и цены. Товары «нет в наличии» не предлагай.
 Помогай выбрать готовый букет (повод, бюджет, цвет) или собрать свой из тюльпанов поштучно и подарков.
 Любые суммы считай только инструментом calculate_bouquet — покупатель увидит карточку сборки с фото и итогом.
 Когда предлагаешь конкретные товары из каталога, ОБЯЗАТЕЛЬНО вызови show_products с их slug — покупатель увидит карточки с фото и ценой. Не перечисляй товары без показа.
 Если покупатель прислал фото букета — опиши, что видишь (цвет, количество, стиль), и подбери максимально похожий вариант из каталога или собери такой из тюльпанов поштучно.
 Доставка: ${site.deliveryPrice} ₽ в пределах МКАД, бесплатно от ${site.freeDeliveryFrom} ₽; до 20 км за МКАД +300 ₽; интервалы: ${deliverySlots.join(", ")}.
-Оформление: когда покупатель выбрал состав — уточни дату, интервал, адрес, текст открытки (по желанию), покажи итог с суммой и спроси явное подтверждение. Только после слов «да/подтверждаю/оформляйте» вызови create_order. Имя и телефон уже есть: ${session.customer_name}, ${session.phone}.
+Оформление: когда покупатель выбрал состав — уточни дату, интервал, адрес, текст открытки (по желанию), покажи итог с суммой и спроси явное подтверждение. Только после слов «да/подтверждаю/оформляйте» вызови create_order. Имя и телефон уже есть у магазина. Адрес покупатель пишет в чат — ты увидишь [адрес]; в create_order передай address: "[адрес]", сайт подставит настоящий.
 ВАЖНО: если покупатель готов оформить заказ, сначала заверши оформление через create_order и только потом, если нужно, зови оператора. Никогда не передавай чат оператору вместо оформления готового заказа.
 ${session.order_id ? "В этом чате уже оформлена заявка." : ""}
 Если вопрос вне твоих возможностей (жалоба, возврат, оплата, особые условия, нестандартная просьба) или покупатель просит человека — вызови request_operator и скажи, что оператор скоро подключится.
@@ -104,7 +114,7 @@ ${catalogText}`;
         const imageBudget = { left: 6 };
         const userParts = async (text: string, att: Attachment[]) => {
           const parts: ({ type: "text"; text: string } | { type: "image"; image: URL })[] = [];
-          if (text) parts.push({ type: "text", text });
+          if (text) parts.push({ type: "text", text: redact(text).text });
           for (const a of att) {
             if (a.type !== "image" || imageBudget.left <= 0) continue;
             const url = await chatImageDataUrl(a.path, a.mime);
@@ -123,7 +133,7 @@ ${catalogText}`;
           if (m.role === "user") {
             past.push({ role: "user", content: await userParts(m.content, att) });
           } else {
-            const txt = `${m.role === "operator" ? "[Оператор магазина]: " : ""}${m.content} ${describe(att)}`.trim();
+            const txt = `${m.role === "operator" ? "[Оператор магазина]: " : ""}${redact(m.content).text} ${describe(att)}`.trim();
             past.push({ role: "assistant", content: txt || "…" });
           }
         }
@@ -233,12 +243,16 @@ ${catalogText}`;
                 const date = input.delivery_date && /^\d{4}-\d{2}-\d{2}$/.test(input.delivery_date) ? input.delivery_date : null;
                 const { error } = await db.from("orders").insert({
                   id: orderId,
-                  customer_name: session.customer_name,
-                  phone: session.phone,
+                  ...(await pii.encryptedOrderFields({
+                    customer_name: session.customer_name,
+                    phone: session.phone,
+                    address:
+                      session.address ??
+                      (input.address && !input.address.includes("[") ? input.address.slice(0, 400) : null),
+                    card_text: input.card_text?.slice(0, 1000) || null,
+                  })),
                   delivery_date: date,
                   delivery_slot: input.delivery_slot?.slice(0, 40) || null,
-                  address: input.address?.slice(0, 400) || null,
-                  card_text: input.card_text?.slice(0, 1000) || null,
                   comment: `Из чата с ИИ-консультантом. ${input.comment ?? ""}`.slice(0, 1000),
                   total: subtotal,
                 });

@@ -15,12 +15,14 @@ export async function notifyNewOrder(orderId: string, source: string) {
       return;
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: o } = await supabaseAdmin
+    const { data: raw } = await supabaseAdmin
       .from("orders")
-      .select("id, customer_name, phone, delivery_date, delivery_slot, address, card_text, comment, total, order_items(title, price, quantity)")
+      .select("id, customer_name, phone, customer_name_enc, phone_enc, address_enc, card_text_enc, delivery_date, delivery_slot, address, card_text, comment, total, order_items(title, price, quantity)")
       .eq("id", orderId)
       .maybeSingle();
-    if (!o) return;
+    if (!raw) return;
+    const { decryptRow } = await import("./pii.server");
+    const o = await decryptRow(raw);
     const items = (o.order_items ?? []).map((i: any) => `• ${esc(i.title)} ×${i.quantity} — ${Number(i.price) * i.quantity} ₽`).join("\n");
     const lines = [
       `🌷 <b>Новая заявка №${o.id.slice(0, 8)}</b> (${esc(source)})`,
@@ -39,9 +41,9 @@ export async function notifyNewOrder(orderId: string, source: string) {
         headers: { Authorization: `Bearer ${lovableKey}`, "X-Connection-Api-Key": tgKey, "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id, text: lines.join("\n"), parse_mode: "HTML", disable_web_page_preview: true }),
       });
-      if (!res.ok) console.error(`[telegram] sendMessage ${res.status}: ${await res.text()}`);
+      if (!res.ok) console.error(`[telegram] sendMessage ${res.status}`);
     }
   } catch (e) {
-    console.error("[telegram] ошибка уведомления", e);
+    console.error("[telegram] ошибка уведомления", e instanceof Error ? e.message : "unknown");
   }
 }

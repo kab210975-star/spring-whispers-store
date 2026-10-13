@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { PrivacyNotice } from "@/components/site/PrivacyNotice";
 import { SiteShell } from "@/components/site/SiteShell";
 import { useCart } from "@/lib/cart";
 import { createOrder } from "@/lib/orders.functions";
@@ -246,6 +247,7 @@ function CartPage() {
             >
               {sending ? "Отправляем…" : `Оставить заявку · ${formatPrice(total)}`}
             </button>
+            <PrivacyNotice />
             <p className="text-xs text-muted-foreground">
               Отправляя заявку, вы соглашаетесь с{" "}
               <Link to="/privacy" className="underline">

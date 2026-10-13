@@ -46,10 +46,14 @@ export const listChats = createServerFn({ method: "GET" })
       .limit(1, { referencedTable: "chat_messages" })
       .limit(300);
     if (error) throw new Error(error.message);
-    const { decryptRow, logPIIAccess } = await import("./pii.server");
+    const { decryptRow, logPIIAccess, fillPII } = await import("./pii.server");
     await logPIIAccess(context.supabase, context.userId, "chats_list", null);
     return Promise.all(
-      (data ?? []).map(async ({ chat_messages, ...s }) => ({ ...(await decryptRow(s)), last: chat_messages?.[0] ?? null })),
+      (data ?? []).map(async ({ chat_messages, ...s }) => {
+        const d = await decryptRow(s);
+        const last = chat_messages?.[0] ?? null;
+        return { ...d, last: last ? { ...last, content: fillPII(last.content, { name: d.customer_name, phone: d.phone }) } : null };
+      }),
     );
   });
 

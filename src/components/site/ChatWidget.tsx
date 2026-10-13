@@ -31,10 +31,13 @@ import {
 import { asAttachments, chatImageUrl, type Attachment, type ImageAttachment } from "@/lib/chat-attachments";
 import { ChatAttachments } from "@/components/site/ChatAttachments";
 import { fileToBase64 } from "@/lib/file-base64";
+import { fillPII } from "@/lib/pii-fill";
+import { PrivacyNotice } from "@/components/site/PrivacyNotice";
 
 const TOKEN_KEY = "tulip-garden-chat-token";
 
 type Status = "ai" | "operator" | "closed";
+type Pii = { name: string | null; phone: string | null; address: string | null };
 type Row = { id: string; role: string; content: string; created_at: string; attachments?: unknown };
 type Meta = { operator?: boolean; attachments?: Attachment[] } | undefined;
 
@@ -62,7 +65,7 @@ export function ChatWidget() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<{ status: Status; messages: UIMessage[]; lastAt: string } | null>(null);
+  const [loaded, setLoaded] = useState<{ status: Status; messages: UIMessage[]; lastAt: string; pii: Pii } | null>(null);
   const history = useServerFn(getChatHistory);
 
   useEffect(() => {
@@ -78,6 +81,7 @@ export function ChatWidget() {
           status: res.status as Status,
           messages: rows.map(rowToMessage),
           lastAt: rows.at(-1)?.created_at ?? new Date(0).toISOString(),
+          pii: res.pii,
         });
       })
       .catch(() => {
@@ -111,9 +115,9 @@ export function ChatWidget() {
           </div>
           {!token ? (
             <StartForm
-              onStarted={(t) => {
+              onStarted={(t, pii) => {
                 window.localStorage.setItem(TOKEN_KEY, t);
-                setLoaded({ status: "ai", messages: [], lastAt: new Date().toISOString() });
+                setLoaded({ status: "ai", messages: [], lastAt: new Date().toISOString(), pii });
                 setToken(t);
               }}
             />
@@ -142,7 +146,7 @@ export function ChatWidget() {
   );
 }
 
-function StartForm({ onStarted }: { onStarted: (token: string) => void }) {
+function StartForm({ onStarted }: { onStarted: (token: string, pii: Pii) => void }) {
   const start = useServerFn(startChat);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -160,7 +164,7 @@ function StartForm({ onStarted }: { onStarted: (token: string) => void }) {
     setError(null);
     try {
       const res = await start({ data: { name: name.trim(), phone: phone.trim(), privacy: true, pd: true } });
-      onStarted(res.token);
+      onStarted(res.token, { name: name.trim(), phone: phone.trim(), address: null });
     } catch {
       setError("Не удалось начать чат. Попробуйте ещё раз.");
     } finally {
@@ -208,6 +212,7 @@ function StartForm({ onStarted }: { onStarted: (token: string) => void }) {
         <input type="checkbox" checked={pd} onChange={(e) => setPd(e.target.checked)} className="mt-0.5" />
         <span>Я даю согласие на обработку персональных данных</span>
       </label>
+      <PrivacyNotice compact />
       {error && <p className="text-sm text-destructive">{error}</p>}
       <button
         type="submit"
@@ -225,7 +230,7 @@ function ChatWindow({
   initial,
 }: {
   token: string;
-  initial: { status: Status; messages: UIMessage[]; lastAt: string };
+  initial: { status: Status; messages: UIMessage[]; lastAt: string; pii: Pii };
 }) {
   const [status, setStatus] = useState<Status>(initial.status);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +353,7 @@ function ChatWindow({
                 <Message key={m.id} from={m.role}>
                   {isOperator && <span className="text-xs text-primary">Оператор</span>}
                   <MessageContent className="group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground group-[.is-user]:rounded-2xl">
-                    {text && <MessageResponse>{text}</MessageResponse>}
+                    {text && <MessageResponse>{m.role === "user" ? text : fillPII(text, initial.pii)}</MessageResponse>}
                     <ChatAttachments items={atts} />
                     {toolWorking && <Shimmer>Сверяюсь с каталогом…</Shimmer>}
                   </MessageContent>

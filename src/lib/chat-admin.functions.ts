@@ -39,14 +39,22 @@ export const listChats = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("chat_sessions")
       .select(
-        "id, customer_name, phone, status, needs_operator, operator_reason, order_id, created_at, updated_at, chat_messages(content, role, created_at)",
+        "id, customer_name, phone, customer_name_enc, phone_enc, status, needs_operator, operator_reason, order_id, created_at, updated_at, chat_messages(content, role, created_at)",
       )
       .order("updated_at", { ascending: false })
       .order("created_at", { referencedTable: "chat_messages", ascending: false })
       .limit(1, { referencedTable: "chat_messages" })
       .limit(300);
     if (error) throw new Error(error.message);
-    return (data ?? []).map(({ chat_messages, ...s }) => ({ ...s, last: chat_messages?.[0] ?? null }));
+    const { decryptRow, logPIIAccess, fillPII } = await import("./pii.server");
+    await logPIIAccess(context.supabase, context.userId, "chats_list", null);
+    return Promise.all(
+      (data ?? []).map(async ({ chat_messages, ...s }) => {
+        const d = await decryptRow(s);
+        const last = chat_messages?.[0] ?? null;
+        return { ...d, last: last ? { ...last, content: fillPII(last.content, { name: d.customer_name, phone: d.phone }) } : null };
+      }),
+    );
   });
 
 export const getChat = createServerFn({ method: "POST" })
@@ -56,7 +64,7 @@ export const getChat = createServerFn({ method: "POST" })
     const [{ data: session, error }, { data: messages }] = await Promise.all([
       context.supabase
         .from("chat_sessions")
-        .select("id, customer_name, phone, status, needs_operator, operator_reason, order_id, created_at, privacy_accepted_at, pd_consent_at")
+        .select("id, customer_name, phone, customer_name_enc, phone_enc, address_enc, status, needs_operator, operator_reason, order_id, created_at, privacy_accepted_at, pd_consent_at")
         .eq("id", data.id)
         .maybeSingle(),
       context.supabase
@@ -67,7 +75,14 @@ export const getChat = createServerFn({ method: "POST" })
     ]);
     if (error) throw new Error(error.message);
     if (!session) throw new Error("Чат не найден");
-    return { session, messages: messages ?? [] };
+    const { decryptRow, logPIIAccess, fillPII } = await import("./pii.server");
+    await logPIIAccess(context.supabase, context.userId, "chat", data.id);
+    const s = await decryptRow({ ...session, address: null as string | null });
+    const pii = { name: s.customer_name, phone: s.phone, address: s.address };
+    return {
+      session: s,
+      messages: (messages ?? []).map((m) => (m.role === "assistant" ? { ...m, content: fillPII(m.content, pii) } : m)),
+    };
   });
 
 export const replyToChat = createServerFn({ method: "POST" })
@@ -150,12 +165,14 @@ export const createOrderFromChat = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertStaff(context);
-    const { data: session } = await context.supabase
+    const { data: rawSession } = await context.supabase
       .from("chat_sessions")
-      .select("id, customer_name, phone, order_id")
+      .select("id, customer_name, phone, customer_name_enc, phone_enc, order_id")
       .eq("id", data.id)
       .maybeSingle();
-    if (!session) throw new Error("Чат не найден");
+    if (!rawSession) throw new Error("Чат не найден");
+    const { decryptRow, encryptedOrderFields } = await import("./pii.server");
+    const session = await decryptRow(rawSession);
     if (session.order_id) throw new Error("Заявка по этому чату уже оформлена");
 
     const ids = data.items.map((i) => i.product_id);
@@ -178,12 +195,14 @@ export const createOrderFromChat = createServerFn({ method: "POST" })
     const date = data.delivery_date && /^\d{4}-\d{2}-\d{2}$/.test(data.delivery_date) ? data.delivery_date : null;
     const { error } = await context.supabase.from("orders").insert({
       id: orderId,
-      customer_name: session.customer_name,
-      phone: session.phone,
+      ...(await encryptedOrderFields({
+        customer_name: session.customer_name,
+        phone: session.phone,
+        address: data.address || null,
+        card_text: data.card_text || null,
+      })),
       delivery_date: date,
       delivery_slot: data.delivery_slot || null,
-      address: data.address || null,
-      card_text: data.card_text || null,
       comment: `Оформлено оператором из чата. ${data.comment ?? ""}`.slice(0, 1000),
       total: subtotal,
     });

@@ -29,6 +29,20 @@
       "when": 1790289790495,
       "tag": "0003_drop_product_images_public_read",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791915318467,
+      "tag": "0004_pii_encryption",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791915530654,
+      "tag": "0005_enable_pg_cron",
+      "breakpoints": true
     }
   ]
 }

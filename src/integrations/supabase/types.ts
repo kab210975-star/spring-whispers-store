@@ -51,42 +51,60 @@ export type Database = {
       }
       chat_sessions: {
         Row: {
+          address_enc: string | null
           created_at: string
           customer_name: string
+          customer_name_enc: string | null
           id: string
           needs_operator: boolean
           operator_reason: string | null
           order_id: string | null
           pd_consent_at: string
           phone: string
+          phone_enc: string | null
+          phone_hash: string | null
+          pii_erased_at: string | null
+          pii_key_version: number
           privacy_accepted_at: string
           status: Database["public"]["Enums"]["chat_status"]
           token: string
           updated_at: string
         }
         Insert: {
+          address_enc?: string | null
           created_at?: string
           customer_name: string
+          customer_name_enc?: string | null
           id?: string
           needs_operator?: boolean
           operator_reason?: string | null
           order_id?: string | null
           pd_consent_at: string
           phone: string
+          phone_enc?: string | null
+          phone_hash?: string | null
+          pii_erased_at?: string | null
+          pii_key_version?: number
           privacy_accepted_at: string
           status?: Database["public"]["Enums"]["chat_status"]
           token: string
           updated_at?: string
         }
         Update: {
+          address_enc?: string | null
           created_at?: string
           customer_name?: string
+          customer_name_enc?: string | null
           id?: string
           needs_operator?: boolean
           operator_reason?: string | null
           order_id?: string | null
           pd_consent_at?: string
           phone?: string
+          phone_enc?: string | null
+          phone_hash?: string | null
+          pii_erased_at?: string | null
+          pii_key_version?: number
           privacy_accepted_at?: string
           status?: Database["public"]["Enums"]["chat_status"]
           token?: string
@@ -150,45 +168,90 @@ export type Database = {
       orders: {
         Row: {
           address: string | null
+          address_enc: string | null
           admin_note: string | null
           card_text: string | null
+          card_text_enc: string | null
           comment: string | null
           created_at: string
           customer_name: string
+          customer_name_enc: string | null
           delivery_date: string | null
           delivery_slot: string | null
           id: string
           phone: string
+          phone_enc: string | null
+          phone_hash: string | null
+          pii_erased_at: string | null
+          pii_key_version: number
           status: Database["public"]["Enums"]["order_status"]
           total: number
         }
         Insert: {
           address?: string | null
+          address_enc?: string | null
           admin_note?: string | null
           card_text?: string | null
+          card_text_enc?: string | null
           comment?: string | null
           created_at?: string
           customer_name: string
+          customer_name_enc?: string | null
           delivery_date?: string | null
           delivery_slot?: string | null
           id?: string
           phone: string
+          phone_enc?: string | null
+          phone_hash?: string | null
+          pii_erased_at?: string | null
+          pii_key_version?: number
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
         }
         Update: {
           address?: string | null
+          address_enc?: string | null
           admin_note?: string | null
           card_text?: string | null
+          card_text_enc?: string | null
           comment?: string | null
           created_at?: string
           customer_name?: string
+          customer_name_enc?: string | null
           delivery_date?: string | null
           delivery_slot?: string | null
           id?: string
           phone?: string
+          phone_enc?: string | null
+          phone_hash?: string | null
+          pii_erased_at?: string | null
+          pii_key_version?: number
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
+        }
+        Relationships: []
+      }
+      pii_access_log: {
+        Row: {
+          created_at: string
+          entity: string
+          entity_id: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          user_id?: string
         }
         Relationships: []
       }

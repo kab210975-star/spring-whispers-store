@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { listChats } from "@/lib/chat-admin.functions";
@@ -33,6 +33,27 @@ export function AdminShell({
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
+
+  // Автовыход после 8 часов бездействия — защита ПДн на оставленном компьютере.
+  useEffect(() => {
+    const KEY = "tulip-admin-last-activity";
+    const LIMIT = 8 * 60 * 60 * 1000;
+    const touch = () => window.localStorage.setItem(KEY, String(Date.now()));
+    const check = () => {
+      const last = Number(window.localStorage.getItem(KEY) ?? Date.now());
+      if (Date.now() - last > LIMIT) void signOut();
+    };
+    check();
+    touch();
+    const events = ["click", "keydown", "scroll"] as const;
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+    const timer = window.setInterval(check, 60_000);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, touch));
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isAdmin = role === "admin";
 

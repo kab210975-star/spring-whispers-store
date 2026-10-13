@@ -24,6 +24,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminChatsRouteImport } from './routes/_authenticated/admin.chats'
 import { Route as AuthenticatedAdminProductsRouteImport } from './routes/_authenticated/admin.products'
 import { Route as AuthenticatedAdminStaffRouteImport } from './routes/_authenticated/admin.staff'
+import { Route as ApiPublicPiiBackfillRouteImport } from './routes/api/public/pii-backfill'
 import { Route as ApiPublicChatImageSplatRouteImport } from './routes/api/public/chat-image.$'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image.$'
 
@@ -102,6 +103,11 @@ const AuthenticatedAdminStaffRoute = AuthenticatedAdminStaffRouteImport.update({
   path: '/admin/staff',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicPiiBackfillRoute = ApiPublicPiiBackfillRouteImport.update({
+  id: '/api/public/pii-backfill',
+  path: '/api/public/pii-backfill',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicChatImageSplatRoute = ApiPublicChatImageSplatRouteImport.update({
   id: '/api/public/chat-image/$',
   path: '/api/public/chat-image/$',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/staff': typeof AuthenticatedAdminStaffRoute
+  '/api/public/pii-backfill': typeof ApiPublicPiiBackfillRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/chat-image/$': typeof ApiPublicChatImageSplatRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/admin/products': typeof AuthenticatedAdminProductsRoute
   '/admin/staff': typeof AuthenticatedAdminStaffRoute
+  '/api/public/pii-backfill': typeof ApiPublicPiiBackfillRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/api/public/chat-image/$': typeof ApiPublicChatImageSplatRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/chats': typeof AuthenticatedAdminChatsRoute
   '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
   '/_authenticated/admin/staff': typeof AuthenticatedAdminStaffRoute
+  '/api/public/pii-backfill': typeof ApiPublicPiiBackfillRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/api/public/chat-image/$': typeof ApiPublicChatImageSplatRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/admin/chats'
     | '/admin/products'
     | '/admin/staff'
+    | '/api/public/pii-backfill'
     | '/admin/'
     | '/api/public/chat-image/$'
     | '/api/public/product-image/$'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/admin/chats'
     | '/admin/products'
     | '/admin/staff'
+    | '/api/public/pii-backfill'
     | '/admin'
     | '/api/public/chat-image/$'
     | '/api/public/product-image/$'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/chats'
     | '/_authenticated/admin/products'
     | '/_authenticated/admin/staff'
+    | '/api/public/pii-backfill'
     | '/_authenticated/admin/'
     | '/api/public/chat-image/$'
     | '/api/public/product-image/$'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   CatalogSlugRoute: typeof CatalogSlugRoute
   CatalogIndexRoute: typeof CatalogIndexRoute
+  ApiPublicPiiBackfillRoute: typeof ApiPublicPiiBackfillRoute
   ApiPublicChatImageSplatRoute: typeof ApiPublicChatImageSplatRoute
   ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
 }
@@ -351,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminStaffRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/pii-backfill': {
+      id: '/api/public/pii-backfill'
+      path: '/api/public/pii-backfill'
+      fullPath: '/api/public/pii-backfill'
+      preLoaderRoute: typeof ApiPublicPiiBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/chat-image/$': {
       id: '/api/public/chat-image/$'
       path: '/api/public/chat-image/$'
@@ -397,6 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   CatalogSlugRoute: CatalogSlugRoute,
   CatalogIndexRoute: CatalogIndexRoute,
+  ApiPublicPiiBackfillRoute: ApiPublicPiiBackfillRoute,
   ApiPublicChatImageSplatRoute: ApiPublicChatImageSplatRoute,
   ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,
 }

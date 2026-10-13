@@ -110,9 +110,13 @@ export async function decryptRow<T extends EncRow>(row: T) {
 
 const PHONE_RE = /(?:\+7|8|7)?[\s\-()]*\d{3}[\s\-()]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2}/g;
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-const ADDRESS_RE =
-  /(?:(?:г\.?\s*)?москва,?\s*)?(?:ул\.|улица|проспект|пр-т|просп\.|пер\.|переулок|шоссе|ш\.|бульвар|б-р|наб\.|набережная|площадь|пл\.|проезд|мкр\.?|микрорайон)\s*[^\n]{2,160}/gi;
-const HOUSE_RE = /[^\n]{0,80}\b(?:д\.|дом)\s*\d+[^\n]{0,80}/gi;
+const STREET = String.raw`(?:ул\.?|улица|проспект|пр-т|просп\.|пер\.|переулок|шоссе|ш\.|бульвар|б-р|наб\.|набережная|площадь|пл\.|проезд|мкр\.?|микрорайон)`;
+const PARTS = String.raw`(?:,?\s*(?:д\.|дом|кв\.|квартира|корп\.|корпус|к\.|стр\.|строение|подъезд|под\.|этаж|эт\.)?\s*\d+[а-яa-z]?(?:\/\d+)?)+`;
+const ADDRESS_RE = new RegExp(
+  String.raw`(?:(?:г\.?\s*)?москва,?\s*)?(?:[А-ЯЁ][а-яё\-]+\s+${STREET}|${STREET}\s+[А-ЯЁа-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+)?)${PARTS}?`,
+  "giu",
+);
+const HOUSE_RE = /(?:д\.|дом)\s*\d+[а-я]?(?:,?\s*(?:кв\.|квартира|корп\.|подъезд)\s*\d+)*/giu;
 
 export type Redaction = { text: string; address: string | null };
 
@@ -120,6 +124,7 @@ export type Redaction = { text: string; address: string | null };
 export function redactPII(text: string, name?: string | null): Redaction {
   let address: string | null = null;
   let out = text.replace(EMAIL_RE, "[email]");
+  out = out.replace(PHONE_RE, (m) => (m.replace(/\D/g, "").length >= 10 ? "[телефон]" : m));
   out = out.replace(ADDRESS_RE, (m) => {
     address = m.trim();
     return "[адрес]";
@@ -128,7 +133,6 @@ export function redactPII(text: string, name?: string | null): Redaction {
     address ??= m.trim();
     return "[адрес]";
   });
-  out = out.replace(PHONE_RE, (m) => (m.replace(/\D/g, "").length >= 10 ? "[телефон]" : m));
   if (name) {
     for (const part of name.split(/\s+/).filter((w) => w.length >= 2)) {
       out = out.replace(new RegExp(`(^|[^\\p{L}])${part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^\\p{L}])`, "giu"), "$1[имя]");
